@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server"; import { db } from "@/lib/db";
+export const dynamic="force-dynamic";
+export async function GET(req:Request){const id=Number(new URL(req.url).searchParams.get("assessmentId"));return NextResponse.json(db.prepare("SELECT student_id,mistakes,score,note FROM scores WHERE assessment_id=?").all(id));}
+export async function POST(req:Request){const {studentId,assessmentId,mistakes,note=""}=await req.json();const m=Number(mistakes);if(!Number.isInteger(m)||m<0||m>90)return NextResponse.json({error:"Kesalahan harus 0–90"},{status:400});const score=90-m;db.prepare("INSERT INTO scores(student_id,assessment_id,mistakes,score,note,assessed_at) VALUES(?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(student_id,assessment_id) DO UPDATE SET mistakes=excluded.mistakes,score=excluded.score,note=excluded.note,assessed_at=CURRENT_TIMESTAMP").run(studentId,assessmentId,m,score,note);return NextResponse.json({score});}

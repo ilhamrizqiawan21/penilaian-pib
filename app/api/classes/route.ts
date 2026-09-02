@@ -1,0 +1,5 @@
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+export const dynamic = "force-dynamic";
+export async function GET(req: Request) { const yearId=Number(new URL(req.url).searchParams.get("academicYearId")); const sql=`SELECT c.*,ay.name AS academic_year_name,ay.semester FROM classes c JOIN academic_years ay ON ay.id=c.academic_year_id ${yearId?"WHERE c.academic_year_id=?":""} ORDER BY ay.is_active DESC,ay.name DESC,c.name`; return NextResponse.json(yearId?db.prepare(sql).all(yearId):db.prepare(sql).all()); }
+export async function POST(req: Request) { try { const { academicYearId,name,gradeLevel="",homeroomTeacher="" }=await req.json(); if(!Number.isInteger(Number(academicYearId))||!String(name).trim()) return NextResponse.json({error:"Tahun ajaran dan nama kelas wajib diisi"},{status:400}); const result=db.prepare("INSERT INTO classes(academic_year_id,name,grade_level,homeroom_teacher) VALUES(?,?,?,?)").run(academicYearId,String(name).trim(),gradeLevel,homeroomTeacher);return NextResponse.json({id:result.lastInsertRowid},{status:201}); } catch { return NextResponse.json({error:"Kelas sudah ada pada tahun ajaran ini"},{status:400}); } }

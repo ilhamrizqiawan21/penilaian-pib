@@ -1,0 +1,14 @@
+{
+  "name": "pib-penilaian",
+  "private": true,
+  "scripts": { "dev": "next dev", "build": "next build", "start": "next start", "lint": "next lint" },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "exceljs": "^4.4.0",
+    "jspdf": "^3.0.3",
+    "next": "^15.5.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": { "@types/better-sqlite3": "^7.6.13", "@types/node": "^22.15.3", "@types/react": "^19.1.2", "typescript": "^5.8.3" }
+}
