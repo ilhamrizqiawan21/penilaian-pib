@@ -1,0 +1,10 @@
+"use client";
+import {useEffect,useState} from "react";
+type R=Record<string,any>;
+export default function Classes(){
+  const[years,setYears]=useState<R[]>([]),[classes,setClasses]=useState<R[]>([]),[message,setMessage]=useState("");
+  const load=()=>Promise.all([fetch("/api/academic-years").then(r=>r.json()),fetch("/api/classes").then(r=>r.json())]).then(([y,c])=>{setYears(y);setClasses(c)});
+  useEffect(()=>{load()},[]);
+  async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const form=e.currentTarget;const f=new FormData(form);const r=await fetch("/api/classes",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({academicYearId:Number(f.get("academicYearId")),name:f.get("name"),gradeLevel:f.get("gradeLevel"),homeroomTeacher:f.get("homeroomTeacher")})});const result=await r.json();setMessage(r.ok?"Kelas tersimpan.":result.error);if(r.ok){form.reset();load()}}
+  return <main className="app"><h1>Data kelas</h1><p className="subtitle">Kelola kelas berdasarkan tahun ajaran.</p>{message&&<p className="notice">{message}</p>}<section className="card"><form onSubmit={submit}><div className="actions"><select name="academicYearId" required><option value="">Pilih tahun ajaran</option>{years.map(x=><option key={x.id} value={x.id}>{x.name} · {x.semester}</option>)}</select><input name="name" placeholder="Nama kelas, mis. VII A" required/><input name="gradeLevel" placeholder="Tingkat"/><input name="homeroomTeacher" placeholder="Wali kelas"/><button className="primary">Simpan kelas</button></div></form></section><section className="card" style={{marginTop:18}}><h2>Daftar kelas ({classes.length})</h2>{classes.length?<table><thead><tr><th>Kelas</th><th>Tahun ajaran</th><th>Tingkat</th><th>Wali kelas</th></tr></thead><tbody>{classes.map(x=><tr key={x.id}><td>{x.name}</td><td>{x.academic_year_name} · {x.semester}</td><td>{x.grade_level||"—"}</td><td>{x.homeroom_teacher||"—"}</td></tr>)}</tbody></table>:<div className="empty">Belum ada kelas.</div>}</section></main>
+}

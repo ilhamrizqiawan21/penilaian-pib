@@ -1,0 +1,2 @@
+import {cookies} from "next/headers";import {db} from "@/lib/db";export {createSession,readSession} from "@/lib/session";import {readSession} from "@/lib/session";
+export async function currentUser(){const id=readSession((await cookies()).get("pib_session")?.value);return id?(db.prepare("SELECT id,name,email,role FROM users WHERE id=?").get(id) as {id:number;name:string;email:string;role:string}|undefined)??null:null}

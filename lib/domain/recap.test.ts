@@ -1,0 +1,2 @@
+import {describe,expect,it} from "vitest";import {recapScores,subchapterComplete} from "./recap";
+describe("recap",()=>{it("mengabaikan kosong dan memakai bobot",()=>{expect(recapScores([{score:90,weight:1},{score:80,weight:2},{score:null,weight:9}])).toEqual({assessed:2,total:170,average:83.3})});it("menentukan selesai",()=>{expect(subchapterComplete(2,3,6)).toBe(true);expect(subchapterComplete(2,3,5)).toBe(false);expect(subchapterComplete(0,3,0)).toBe(false)})});

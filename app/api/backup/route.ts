@@ -1,3 +1,3 @@
-import { NextResponse } from "next/server"; import { db } from "@/lib/db";
-export const dynamic="force-dynamic";
-export async function GET(){const data={version:1,exportedAt:new Date().toISOString(),students:db.prepare("SELECT * FROM students").all(),assessments:db.prepare("SELECT * FROM assessments").all(),scores:db.prepare("SELECT * FROM scores").all()};return new NextResponse(JSON.stringify(data,null,2),{headers:{"Content-Type":"application/json","Content-Disposition":"attachment; filename=pib-backup.json"}});}
+import {NextResponse} from "next/server";import {db} from "@/lib/db";
+const tables=["users","academic_years","classes","students","curriculum_templates","chapters","subchapters","assessments","scores","settings","audit_logs"];
+export async function GET(){const data=Object.fromEntries(tables.map(t=>[t,db.prepare("SELECT * FROM "+t).all()]));return new NextResponse(JSON.stringify({version:1,createdAt:new Date().toISOString(),data}),{headers:{"Content-Type":"application/json","Content-Disposition":"attachment; filename=backup-pib.json"}})}

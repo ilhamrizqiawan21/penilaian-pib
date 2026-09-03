@@ -1,216 +1,69 @@
-# Rancangan Aplikasi Penilaian Praktik Ibadah (PIB)
+# Rancangan Baru Aplikasi PIB
 
 ## Tujuan
 
-Membuat aplikasi lokal berbasis web/PWA untuk membantu guru mencatat dan merekap Penilaian Praktik Ibadah. Format penilaian mengikuti pola buku fisik: materi praktik, nilai, paraf, dan keterangan per siswa, tetapi bab, subbab, materi, kelas, dan siswa dapat diinput sendiri.
+Aplikasi web lokal untuk satu guru mencatat Penilaian Praktik Ibadah, melihat rekap, mencetak laporan, dan backup/restore. Kode disiapkan untuk upgrade multi-perangkat, tetapi multi-user dan cloud sync bukan target versi pertama.
 
-## Rekomendasi bentuk aplikasi
+## Stack dan deployment
 
-Mulai sebagai **web app responsif yang dapat dipasang sebagai PWA**.
+- Next.js App Router, React, TypeScript strict.
+- SQLite lokal melalui Prisma; PostgreSQL hanya opsi saat kelak menjadi server bersama.
+- Prisma Client/Migrate dan Zod.
+- Vitest untuk domain test.
+- ExcelJS untuk Excel.
+- HTML/CSS server-side dengan Playwright/Chromium untuk PDF A4.
 
-- Dipakai dari laptop untuk pengaturan data dan mencetak laporan.
-- Dipakai dari ponsel/tablet saat praktik berlangsung.
-- Setelah aplikasi inti selesai, PWA menyimpan data kerja sementara saat offline dan menyinkronkan kembali ketika internet tersedia.
-- Untuk penggunaan satu guru di satu perangkat, aplikasi dapat berjalan lokal. Untuk beberapa guru/perangkat, gunakan server/database bersama di jaringan sekolah atau cloud.
+Versi pertama berjalan mandiri tanpa service database terpisah. SQLite menjadi sumber kebenaran, sedangkan IndexedDB dipakai untuk cache dan draft offline.
 
-## Alur penggunaan
+## Standar visual dan performa
 
-1. Admin/guru membuat tahun ajaran dan kelas.
-2. Guru memasukkan daftar siswa secara manual atau melalui impor Excel.
-3. Guru membuat struktur penilaian: bab, subbab, lalu materi/indikator praktik.
-4. Saat penilaian, guru memilih kelas dan materi, lalu memasukkan nilai tiap siswa. Paraf dan keterangan bersifat opsional.
-5. Sistem menghitung total, rata-rata, dan status kelengkapan penilaian otomatis.
-6. Guru melihat rekap lalu mengekspor hasil sebagai Excel atau PDF.
+Hasil akhir wajib modern, bersih, konsisten, responsif, dan tidak terlihat seperti CRUD klasik. Gunakan whitespace, hierarki visual, empty state, feedback autosave, akses keyboard, dan tabel nyaman di ponsel. Hindari dependency, animasi, dan request yang tidak perlu. UI harus ringan dan stabil pada komputer sekolah serta ponsel kelas bawah; ukur bundle dan waktu respons pada setiap milestone.
 
-## Fitur versi pertama (MVP)
+## Arsitektur
 
-### 1. Master data
+Browser/PWA -> UI React -> Route Handlers/Server Actions -> Zod -> domain services -> Prisma repositories -> SQLite
 
-- Tahun ajaran dan semester.
-- Kelas.
-- Data siswa: NIS/NISN, nama, jenis kelamin, dan status aktif.
-- Pengaturan rentang nilai dan predikat bila diperlukan.
+Domain service wajib memuat scoring, rekap, laporan, dan backup. Aturan bisnis tidak boleh hanya berada di UI. Tulisan multi-tabel menggunakan transaksi dan perubahan penting dicatat di audit log.
 
-### 2. Struktur materi PIB
+## Model data
 
-- Bab, misalnya: Salat, Wudu, Doa, Jenazah.
-- Subbab, misalnya: Salat Jenazah.
-- Materi/indikator yang dinilai, misalnya: Niat Salat Jenazah, Bacaan Takbir Pertama, Tata Cara Wudu.
-- Urutan tampilan materi.
-- Bobot materi opsional.
+User -> AuditLog
+User -> Score <- Student <- Class <- AcademicYear
+AcademicYear -> CurriculumTemplate -> Chapter -> Subchapter -> Assessment
+Student + Assessment = Score unik
 
-### 3. Input penilaian
+Entitas: User, AcademicYear, Class, Student, CurriculumTemplate, Chapter, Subchapter, Assessment, Score, Setting, AuditLog, dan SyncOperation saat offline penuh diperlukan.
 
-- Tampilan tabel/grid seperti buku nilai.
-- Input nilai per siswa untuk setiap materi.
-- Kolom paraf dan keterangan.
-- Tanggal penilaian dan nama penilai.
-- Penyimpanan otomatis setelah nilai diubah.
-- Penanda siswa atau materi yang belum dinilai.
+Score.mistakes dan Score.score nullable. Nilai kosong adalah NULL, bukan nol. Parent yang memiliki nilai tidak boleh dihapus permanen; nonaktifkan. Semua perubahan schema melalui Prisma Migrate.
 
-### 4. Rekap dan progres
+## Aturan nilai
 
-- Total nilai siswa.
-- Rata-rata nilai siswa.
-- Rata-rata per materi dan per kelas.
-- Status subbab selesai jika seluruh siswa pada materi di dalamnya telah dinilai.
-- Filter berdasarkan tahun ajaran, kelas, bab, subbab, materi, dan siswa.
+- Input kesalahan integer 0-90.
+- nilai = 90 - jumlah_kesalahan, hasil 0-90.
+- Nilai 0 berarti 90 kesalahan; NULL berarti belum dinilai.
+- Total/rata-rata hanya memakai nilai terisi.
+- Rata-rata berbobot = jumlah(nilai x bobot) / jumlah(bobot) materi terisi.
+- Subbab selesai bila seluruh siswa aktif dalam scope memiliki nilai untuk seluruh assessment aktif.
 
-### 5. Laporan
+## Modul dan laporan
 
-- Ekspor Excel (`.xlsx`) untuk pengolahan lebih lanjut.
-- Ekspor PDF ukuran A4 untuk cetak dan arsip.
-- Pilihan laporan: per kelas, per siswa, per bab/subbab, atau keseluruhan periode.
-- Format PDF menampilkan identitas sekolah/guru, kelas, daftar materi, nilai, total, rata-rata, paraf, dan keterangan.
+Modul: login satu guru, dashboard, periode/kelas/siswa, template materi, input grid, rekap, laporan, backup/restore, dan draft offline.
 
-## Aturan perhitungan nilai
+Kontrak filter bersama untuk rekap, Excel, dan PDF: tahun ajaran/semester, kelas, siswa, bab, subbab, materi, serta cakupan semua/kelas/siswa/struktur materi.
 
-- **Total siswa** = jumlah seluruh nilai materi yang telah terisi.
-- **Rata-rata siswa** = total nilai dibagi jumlah materi yang telah terisi.
-- Jika bobot dipakai: rata-rata = jumlah `(nilai × bobot)` dibagi total bobot materi yang sudah terisi.
-- Nilai kosong **bukan nol**. Nilai tersebut ditampilkan sebagai *Belum dinilai*, sehingga guru tidak keliru menganggap siswa memperoleh nol.
-- Nilai nol hanya dicatat apabila guru memang memasukkan angka `0`.
+Excel memiliki Nilai Detail, Rekap Siswa, dan Rekap Kelas, termasuk bobot, nilai, total, rata-rata, status, tanggal, penilai, paraf, dan keterangan. PDF A4 memuat identitas sekolah/guru, parameter, daftar materi, nilai, total, rata-rata, progress, paraf, keterangan, header berulang, footer nomor halaman, dan page break.
 
-## Skema database yang disarankan
+## Tahapan
 
-### `users`
+1. Fondasi project, environment, Docker, Prisma, migrasi, seed, dan error handling.
+2. Login lokal dan proteksi route.
+3. Master data serta duplikasi template ke periode baru.
+4. Scoring, input nilai, autosave, audit, dan progress.
+5. Rekap dan kontrak filter bersama.
+6. Excel, PDF, backup, dan restore.
+7. PWA cache, draft offline, lalu evaluasi offline penuh.
+8. Testing penerimaan, dokumentasi, dan rilis.
 
-Menyimpan akun pengguna.
+## Kriteria selesai
 
-- `id`
-- `name`
-- `email`
-- `password_hash`
-- `role` — `admin` atau `guru`
-- `created_at`, `updated_at`
-
-Untuk penggunaan pribadi lokal, tabel ini dapat disederhanakan atau bahkan ditambahkan belakangan.
-
-### `academic_years`
-
-- `id`
-- `name` — contoh: `2026/2027`
-- `semester`
-- `is_active`
-
-### `classes`
-
-- `id`
-- `academic_year_id`
-- `name` — contoh: `VII A`
-- `grade_level`
-- `homeroom_teacher_id` (opsional)
-
-Satu tahun ajaran dapat memiliki banyak kelas.
-
-### `students`
-
-- `id`
-- `class_id`
-- `nis`
-- `nisn` (opsional)
-- `name`
-- `gender`
-- `is_active`
-
-Satu kelas memiliki banyak siswa.
-
-### `chapters`
-
-- `id`
-- `title`
-- `display_order`
-- `created_by`
-
-### `subchapters`
-
-- `id`
-- `chapter_id`
-- `title`
-- `display_order`
-
-Satu bab memiliki banyak subbab.
-
-### `assessments`
-
-Mewakili satu materi atau indikator praktik yang dinilai.
-
-- `id`
-- `subchapter_id`
-- `title`
-- `description` (opsional)
-- `weight` (opsional, nilai awal `1`)
-- `display_order`
-- `is_active`
-
-### `scores`
-
-Menyimpan nilai per siswa untuk tiap materi.
-
-- `id`
-- `student_id`
-- `assessment_id`
-- `score` (nullable; kosong berarti belum dinilai)
-- `assessed_at`
-- `assessor_id`
-- `initials` — paraf/inisial penilai (opsional)
-- `note` — keterangan (opsional)
-- `created_at`, `updated_at`
-
-Kombinasi `student_id` dan `assessment_id` harus unik agar satu siswa tidak memiliki dua nilai aktif untuk materi yang sama.
-
-## Relasi data
-
-```text
-Tahun Ajaran → Kelas → Siswa
-
-Bab → Subbab → Materi/Indikator → Nilai ← Siswa
-                              ↑
-                           Penilai
-```
-
-## Stack teknologi yang diajukan
-
-- **Frontend dan aplikasi web:** Next.js + TypeScript.
-- **Tampilan:** Tailwind CSS + shadcn/ui.
-- **Database:** PostgreSQL.
-- **ORM dan migrasi database:** Prisma.
-- **PWA/offline:** Serwist atau Workbox untuk cache aplikasi; IndexedDB untuk antrean perubahan saat perangkat offline.
-- **Ekspor Excel:** ExcelJS.
-- **Ekspor PDF:** `@react-pdf/renderer` atau Puppeteer, tergantung format cetak yang dipilih.
-- **Autentikasi dan penyimpanan awal:** Supabase Auth + PostgreSQL, atau server lokal sekolah.
-
-## Rencana pengerjaan
-
-### Tahap 1 — Fondasi
-
-- Membuat proyek aplikasi dan database.
-- Halaman tahun ajaran, kelas, serta siswa.
-- Halaman input bab, subbab, dan materi.
-
-### Tahap 2 — Penilaian inti
-
-- Tampilan grid input nilai.
-- Total, rata-rata, dan status belum dinilai.
-- Paraf, keterangan, dan riwayat tanggal penilaian.
-
-### Tahap 3 — Rekap dan laporan
-
-- Halaman rekap per siswa dan kelas.
-- Filter data.
-- Ekspor Excel dan PDF.
-
-### Tahap 4 — PWA dan penyempurnaan
-
-- Instalasi aplikasi di ponsel.
-- Penggunaan offline dan sinkronisasi.
-- Backup/restore data.
-- Uji coba dengan data penilaian nyata dan penyesuaian format PDF seperti buku fisik.
-
-## Keputusan awal yang perlu ditetapkan sebelum pembangunan
-
-1. Aplikasi hanya untuk satu guru, atau akan dipakai beberapa guru?
-2. Apakah nilai memakai skala 0–100 dan apakah setiap materi memiliki bobot berbeda?
-3. Apakah format PDF harus sama persis seperti buku fisik, atau cukup rapi dengan struktur data yang sama?
-4. Apakah siswa akan selalu diinput satu per satu, atau perlu impor dari Excel sejak versi pertama?
-5. Apakah aplikasi akan dipakai hanya pada jaringan/laptop sekolah atau juga dari luar sekolah?
+Guru dapat membuat periode, kelas, siswa, dan materi; mengisi nilai; melihat rekap; mengunduh laporan terfilter; dan memulihkan backup. Build, migrasi, unit test perhitungan, serta uji laporan wajib berhasil.
