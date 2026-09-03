@@ -8,15 +8,15 @@ Status hanya boleh dicentang setelah browser test.
 - [x] Provider toast untuk keberhasilan aksi.
 - [x] `ConfirmDialog` aksesibel untuk aksi destruktif.
 - [x] `PageHeader`, `Alert`, `EmptyState`, `LoadingState`, dan `Breadcrumb`.
-- [ ] Terapkan toast pada seluruh mutasi berhasil; error/validasi tetap inline.
-- [~] Restore dan pengosongan nilai sudah memakai `ConfirmDialog`; dialog siswa masih perlu dimigrasikan.
+- [x] Terapkan toast pada seluruh mutasi berhasil; error/validasi tetap inline.
+- [x] Restore, pengosongan nilai, dan nonaktifkan siswa memakai `ConfirmDialog`.
 
 ## Layout & responsivitas
 
 - [x] Pastikan seluruh subroute Materi menandai menu Materi sebagai aktif.
 - [x] Komponen breadcrumb tersedia untuk alur bertingkat.
 - [ ] Uji 1280 px, 768 px, dan 360 px pada semua halaman utama.
-- [ ] Pastikan tabel panjang nyaman di layar kecil dan tidak tertutup mobile navigation.
+- [x] Pastikan tabel panjang nyaman di layar kecil dan tidak tertutup mobile navigation.
 
 ## Refactor halaman
 
