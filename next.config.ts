@@ -1,3 +1,3 @@
-import type { NextConfig } from "next";
-const nextConfig: NextConfig = { serverExternalPackages: ["better-sqlite3"] };
-export default nextConfig;
+import type {NextConfig} from "next";
+const config:NextConfig={serverExternalPackages:["better-sqlite3"],distDir:process.env.NODE_ENV==="production"?".next-prod":".next"};
+export default config;

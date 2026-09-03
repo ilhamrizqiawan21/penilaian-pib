@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-export const dynamic = "force-dynamic";
-export async function GET() { return NextResponse.json(db.prepare("SELECT * FROM academic_years ORDER BY is_active DESC,name DESC,semester").all()); }
-export async function POST(req: Request) { try { const { name, semester, isActive=false } = await req.json(); if (!/^\d{4}\/\d{4}$/.test(String(name)) || !["Ganjil","Genap"].includes(semester)) return NextResponse.json({ error:"Tahun ajaran harus berformat YYYY/YYYY dan semester wajib dipilih" },{status:400}); const run=db.transaction(()=>{if(isActive)db.prepare("UPDATE academic_years SET is_active=0").run();return db.prepare("INSERT INTO academic_years(name,semester,is_active) VALUES(?,?,?)").run(name,semester,isActive?1:0)}); const result=run(); return NextResponse.json({id:result.lastInsertRowid},{status:201}); } catch { return NextResponse.json({error:"Tahun ajaran tersebut sudah ada"},{status:400}); } }
+import {NextResponse} from "next/server";import {db} from "@/lib/db";import {z} from "zod";
+const schema=z.object({name:z.string().trim().min(4).max(20),semester:z.enum(["Ganjil","Genap"]),isActive:z.boolean().optional()});
+export async function GET(){return NextResponse.json(db.prepare("SELECT * FROM academic_years ORDER BY name DESC,semester").all())}
+export async function POST(req:Request){try{const x=schema.parse(await req.json());const r=db.prepare("INSERT INTO academic_years(name,semester,is_active) VALUES(?,?,?)").run(x.name,x.semester,x.isActive?1:0);return NextResponse.json({id:r.lastInsertRowid},{status:201})}catch{return NextResponse.json({error:"Tahun ajaran tidak valid atau sudah ada"},{status:400})}}

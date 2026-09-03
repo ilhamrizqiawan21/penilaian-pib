@@ -1,28 +1,23 @@
-# PIB — Penilaian Praktik Ibadah
+# PIB Penilaian
 
-Aplikasi lokal untuk mencatat nilai hafalan/praktik dengan nilai sempurna 90 dan pengurangan satu poin per kesalahan.
+Aplikasi lokal untuk Penilaian Praktik Ibadah. Stack: Next.js, TypeScript, SQLite langsung melalui better-sqlite3, React, ExcelJS, dan jsPDF.
 
-## Menjalankan aplikasi
+## Menjalankan
 
 ```bash
+cp .env.example .env
 npm install
+npm run db:setup
 npm run dev
 ```
 
-Kemudian buka `http://localhost:3000`.
+Login demo: `guru@pib.local` / `pib12345`.
 
-Data tersimpan dalam berkas `pib.sqlite` di folder proyek. Gunakan menu **Laporan & Backup** untuk mengunduh backup JSON sebelum memindahkan atau memperbarui aplikasi.
+Nilai dihitung sebagai `90 - jumlah kesalahan`; nilai kosong berbeda dari nol.
 
-## Impor siswa
+## Verifikasi
 
-Siapkan file `.xlsx` dengan header di baris pertama:
+Jalankan npm test, npx tsc --noEmit, npm run build, dan npm run perf:check.
+Versi awal: 0.1.0. Unduh backup JSON sebelum melakukan update.
 
-```text
-NIS | Nama | Kelas
-```
-
-Kolom NIS bersifat opsional.
-
-## Input cepat
-
-Di halaman **Nilai**, ketik jumlah kesalahan untuk siswa lalu tekan `Enter`. Aplikasi menyimpan nilai `90 − kesalahan` dan memindahkan fokus ke siswa berikutnya.
+Panduan login tersedia di docs/panduan-login.md.
