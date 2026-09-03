@@ -1,4 +1,5 @@
 import "./globals.css";
+import "./sidebar-fixes.css";
 import OfflineIndicator from "./offline-indicator";
 import AppLayout from "./app-layout";
 import {ToastProvider} from "./ui";

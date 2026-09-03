@@ -1,8 +1,11 @@
 node_modules
 .next
 .next-prod
+.next-stale-*
 .env
+.env.local
 coverage
+logs/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
