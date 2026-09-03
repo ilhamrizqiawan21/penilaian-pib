@@ -1,14 +1,5 @@
 "use client";
-import { useState } from "react";
-
-export default function Account() {
-  const [message, setMessage] = useState("");
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setMessage("");
-    const body = Object.fromEntries(new FormData(event.currentTarget));
-    const response = await fetch("/api/auth/change-password", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    setMessage(response.ok ? "Password berhasil diubah." : (await response.json()).error);
-    if (response.ok) event.currentTarget.reset();
-  }
-  return <main className="app"><h1>Akun guru</h1><section className="card" style={{ maxWidth: 520 }}><h2>Ubah password</h2><form onSubmit={submit}><p><input name="currentPassword" type="password" placeholder="Password saat ini" required /></p><p><input name="newPassword" type="password" minLength={8} placeholder="Password baru (minimal 8 karakter)" required /></p><button className="primary">Simpan password</button></form>{message && <p className="notice">{message}</p>}</section></main>;
-}
+import {useState} from "react";
+import {api,errorMessage,jsonRequest} from "@/lib/client-api";
+import {Alert,PageHeader,useToast} from "@/app/ui";
+export default function Account(){const[error,setError]=useState(""),[busy,setBusy]=useState(false);const toast=useToast();async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();const form=event.currentTarget;setError("");setBusy(true);try{await api("/api/auth/change-password",jsonRequest("POST",Object.fromEntries(new FormData(form))));form.reset();toast("Password berhasil diubah.")}catch(e){setError(errorMessage(e))}finally{setBusy(false)}}return <main className="app"><PageHeader eyebrow="Keamanan" title="Akun guru" description="Perbarui password secara berkala dan jangan membagikannya kepada orang lain."/><section className="card narrow"><h2>Ubah password</h2><form className="section-stack section-gap" onSubmit={submit}><div className="field"><label htmlFor="current-password">Password saat ini</label><input id="current-password" name="currentPassword" type="password" autoComplete="current-password" required/></div><div className="field"><label htmlFor="new-password">Password baru</label><input id="new-password" name="newPassword" type="password" autoComplete="new-password" minLength={8} aria-describedby="password-hint" required/><p className="hint" id="password-hint">Gunakan minimal 8 karakter yang sulit ditebak.</p></div>{error&&<Alert type="error">{error}</Alert>}<button className="primary" disabled={busy}>{busy?"Menyimpan…":"Simpan password"}</button></form></section></main>}

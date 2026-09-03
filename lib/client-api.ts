@@ -1,0 +1,5 @@
+export type FieldErrors = Record<string, string[]>;
+export class ApiError extends Error { constructor(message:string,public status=0,public fieldErrors?:FieldErrors){super(message);this.name="ApiError"} }
+export async function api<T>(input:RequestInfo|URL,init?:RequestInit):Promise<T>{let response:Response;try{response=await fetch(input,init)}catch{throw new ApiError("Tidak dapat terhubung ke aplikasi. Periksa koneksi lalu coba lagi.")}const contentType=response.headers.get("content-type")??"";const data=contentType.includes("application/json")?await response.json().catch(()=>null):null;if(!response.ok)throw new ApiError(data?.error??"Permintaan tidak dapat diproses.",response.status,data?.fieldErrors);return data as T}
+export const jsonRequest=(method:string,body?:unknown,signal?:AbortSignal):RequestInit=>({method,signal,headers:{"content-type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
+export const errorMessage=(error:unknown)=>error instanceof Error?error.message:"Terjadi kesalahan. Silakan coba lagi.";

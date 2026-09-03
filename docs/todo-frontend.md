@@ -9,18 +9,18 @@ Status hanya boleh dicentang setelah browser test.
 - [x] `ConfirmDialog` aksesibel untuk aksi destruktif.
 - [x] `PageHeader`, `Alert`, `EmptyState`, `LoadingState`, dan `Breadcrumb`.
 - [ ] Terapkan toast pada seluruh mutasi berhasil; error/validasi tetap inline.
-- [ ] Ganti modal lama dengan `ConfirmDialog` dan kembalikan fokus ke pemicu.
+- [~] Restore dan pengosongan nilai sudah memakai `ConfirmDialog`; dialog siswa masih perlu dimigrasikan.
 
 ## Layout & responsivitas
 
-- [ ] Pastikan seluruh subroute Materi menandai menu Materi sebagai aktif.
+- [x] Pastikan seluruh subroute Materi menandai menu Materi sebagai aktif.
 - [x] Komponen breadcrumb tersedia untuk alur bertingkat.
 - [ ] Uji 1280 px, 768 px, dan 360 px pada semua halaman utama.
 - [ ] Pastikan tabel panjang nyaman di layar kecil dan tidak tertutup mobile navigation.
 
 ## Refactor halaman
 
-- [ ] Seragamkan Master Data, Kelas, Akun, Setup, Penilaian, Rekap, Laporan, dan Materi ke komponen UI bersama.
+- [~] Fondasi, Master Data, Kelas, Akun, Setup, Penilaian, Dashboard, dan Laporan sudah diperbarui; halaman lain masih perlu verifikasi akhir.
 - [ ] Tambahkan label eksplisit pada semua form lama yang masih memakai placeholder.
 - [ ] Tambahkan loading, empty, error, dan retry di setiap halaman yang mengambil data.
 - [ ] Terapkan breadcrumb nama aktual untuk Bab dan Subbab.
