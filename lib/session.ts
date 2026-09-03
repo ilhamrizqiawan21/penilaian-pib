@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
+import { env } from "@/lib/env";
 
-const secret = process.env.SESSION_SECRET || "development-only-secret-change-me";
+const secret = env.SESSION_SECRET;
 const sign = (value: string) => crypto.createHmac("sha256", secret).update(value).digest("base64url");
 
 export function createSession(userId: number) {

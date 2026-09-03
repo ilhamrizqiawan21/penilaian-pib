@@ -3,5 +3,9 @@ node_modules
 .next-prod
 .env
 coverage
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+backups/
 prisma/migrations
 prisma/pib.sqlite*

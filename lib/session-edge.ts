@@ -1,4 +1,5 @@
-const secret = process.env.SESSION_SECRET || "development-only-secret-change-me";
+import { env } from "@/lib/env";
+const secret = env.SESSION_SECRET;
 
 function decode(value: string) {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
