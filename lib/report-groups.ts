@@ -23,8 +23,8 @@ export function groupAverageRows(rows: ReportRow[]): ChapterGroup[] {
   const chapters = new Map<string, Map<string, Map<string, ReportRow[]>>>();
   for (const row of rows) {
     const chapter = String(row.chapter);
-    const className = String(row.class_name);
-    const studentKey = String(row.nis ?? row.name);
+    const className = [row.class_name,row.academic_year_name,row.semester].filter(Boolean).join(" · ");
+    const studentKey = String(row.student_id ?? row.nis ?? row.name);
     const classes = chapters.get(chapter) ?? new Map<string, Map<string, ReportRow[]>>();
     const students = classes.get(className) ?? new Map<string, ReportRow[]>();
     const studentRows = students.get(studentKey) ?? [];
@@ -41,7 +41,8 @@ export function groupAverageRows(rows: ReportRow[]): ChapterGroup[] {
       rows: Array.from(students.values(), (studentRows) => {
         const first = studentRows[0];
         const scored = studentRows.filter((row) => row.score != null);
-        const total = scored.reduce((sum, row) => sum + Number(row.score), 0);
+        const total = scored.reduce((sum, row) => sum + Number(row.score) * Number(row.weight ?? 1), 0);
+        const weight = scored.reduce((sum, row) => sum + Number(row.weight ?? 1), 0);
         const status: AveragedRow["status"] = scored.length === 0 ? "Belum dinilai" : scored.length === studentRows.length ? "Dinilai" : "Sebagian dinilai";
         return {
           nis: String(first.nis ?? ""),
@@ -49,7 +50,7 @@ export function groupAverageRows(rows: ReportRow[]): ChapterGroup[] {
           gender: String(first.gender || "-"),
           className: String(first.class_name),
           chapter: label,
-          average: scored.length ? rounded(total / scored.length) : null,
+          average: scored.length ? rounded(total / weight) : null,
           assessed: scored.length,
           totalItems: studentRows.length,
           status,

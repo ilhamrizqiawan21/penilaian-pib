@@ -1,7 +1,8 @@
 const base=process.env.PIB_URL||"http://127.0.0.1:3000";let passed=0;
 async function check(name,path,status,options={}){const r=await fetch(base+path,options);if(r.status!==status)throw Error(`${name}: expected ${status}, got ${r.status}`);passed++;console.log(`ok - ${name}`);return r}
+await check("origin asing ditolak","/api/auth/login",403,{method:"POST",headers:{origin:"http://invalid.example","content-type":"application/json"},body:"{}"});
 await check("API tanpa login ditolak","/api/students",401);
-const login=await check("login valid","/api/auth/login",200,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:"guru@pib.local",password:"pib12345"})});
+const login=await check("login valid","/api/auth/login",200,{method:"POST",headers:{"content-type":"application/json",origin:new URL(base).origin},body:JSON.stringify({email:"guru@pib.local",password:"pib12345"})});
 const cookie=login.headers.get("set-cookie")?.split(";")[0];if(!cookie)throw Error("cookie session tidak diterbitkan");
 const headers={cookie};
 for(const path of ["/api/academic-years","/api/classes","/api/students","/api/templates","/api/chapters","/api/subchapters","/api/assessments"])await check(`master ${path}`,path,200,{headers});

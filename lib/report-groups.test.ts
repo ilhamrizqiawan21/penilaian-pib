@@ -24,3 +24,16 @@ describe("report groups", () => {
     expect(averageStats(groups[0].classes[0].rows)).toEqual({ scored: 0, total: 0, average: null });
   });
 });
+
+it("keeps same-name students separate and uses material weights",()=>{
+ const groups=groupAverageRows([
+  {student_id:1,name:"Ani",class_name:"VII A",chapter:"Bab",score:90,weight:1},
+  {student_id:1,name:"Ani",class_name:"VII A",chapter:"Bab",score:60,weight:2},
+  {student_id:2,name:"Ani",class_name:"VII A",chapter:"Bab",score:80,weight:1},
+ ]);
+ expect(groups[0].classes[0].rows.map(r=>r.average)).toEqual([70,80]);
+});
+it("separates identically named classes across periods",()=>{
+ const groups=groupAverageRows([1,2].map(id=>({student_id:id,name:"Ani",class_name:"VII A",academic_year_name:"2026/2027",semester:id===1?"Ganjil":"Genap",chapter:"Bab",score:90})));
+ expect(groups[0].classes).toHaveLength(2);
+});

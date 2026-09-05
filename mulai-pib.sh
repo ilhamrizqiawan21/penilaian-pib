@@ -17,7 +17,7 @@ fail() {
   exit 1
 }
 
-command -v node >/dev/null 2>&1 || fail "Node.js belum terpasang. Gunakan Node.js 20 atau lebih baru."
+command -v node >/dev/null 2>&1 || fail "Node.js belum terpasang. Gunakan Node.js 24.x."
 command -v npm >/dev/null 2>&1 || fail "npm belum tersedia."
 command -v curl >/dev/null 2>&1 || fail "curl belum terpasang dan diperlukan untuk memeriksa kesiapan server."
 
@@ -27,8 +27,8 @@ open_browser() {
   fi
 }
 
-node -e 'const major=Number(process.versions.node.split(".")[0]); if(major < 20) process.exit(1)' \
-  || fail "Node.js 20 atau lebih baru diperlukan. Versi saat ini: $(node --version)"
+node -e 'const major=Number(process.versions.node.split(".")[0]); if(major !== 24) process.exit(1)' \
+  || fail "Node.js 24.x diperlukan. Versi saat ini: $(node --version)"
 
 if [[ ! -x "$NEXT_BIN" ]]; then
   echo "[PIB] Dependency belum tersedia, memasang package..."

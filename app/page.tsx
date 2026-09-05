@@ -1,2 +1,4 @@
-import Link from "next/link";
-export default function Home(){return <main className="app"><h1>PIB Penilaian</h1><p className="subtitle">Penilaian Praktik Ibadah · lokal, siap offline</p><section className="grid"><div className="card stat"><span className="notice">Sistem</span><b>Siap dirakit</b><p className="notice">SQLite · offline-ready</p></div><div className="card"><h2>Mulai pengaturan</h2><p>Bangun tahun ajaran, kelas, siswa, dan template materi.</p><div className="actions"><Link className="button primary" href="/setup">Buka setup</Link><Link className="button" href="/login">Login</Link></div></div></section></main>}
+import {redirect} from "next/navigation";
+import {currentUser} from "@/lib/auth";
+export const dynamic="force-dynamic";
+export default async function Home(){redirect(await currentUser()?"/dashboard":"/login")}
