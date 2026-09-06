@@ -6,6 +6,11 @@ export function parseMistakes(raw:string):{valid:true;mistakes:number|null;score
   if(!/^\d+$/.test(raw.trim())||!Number.isInteger(value)||value<0||value>90)return {valid:false,error:"Isi bilangan bulat 0–90."};
   return {valid:true,mistakes:value,score:90-value};
 }
+export function stepMistakes(raw:string,delta:number):string|null{
+  const parsed=parseMistakes(raw);
+  if(!parsed.valid)return null;
+  return String(Math.max(0,Math.min(90,(parsed.mistakes??0)+delta)));
+}
 export function draftKey(studentId:number,assessmentId:number){return `${studentId}:${assessmentId}`}
 export function isUnassessed(score:number|null|undefined,draft?:ScoreDraft){return score==null||!!draft}
 export const DRAFT_PREFIX="pib-score-edit:";

@@ -1,11 +1,11 @@
 "use client";
 import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
-import {ArrowRight,Check,Download,RotateCcw,Save} from "lucide-react";
+import {ArrowRight,Check,Download,Eraser,Minus,Plus,RotateCcw,Save} from "lucide-react";
 import {api,errorMessage} from "@/lib/client-api";
 import {Assessment as Material,Chapter,ScoreRow,SchoolClass,Student,Subchapter} from "@/lib/frontend-types";
 import {Alert,ConfirmDialog,EmptyState,ErrorState,LoadingState,PageHeader,ProgressBar,SearchField,StatusBadge,useToast} from "@/app/ui";
-import {DRAFT_EVENT,LAST_ASSESSMENT,ScoreDraft,createDraftId,deleteDraft,draftKey,isUnassessed,parseMistakes,persistDraft,readDrafts} from "@/lib/assessment-workspace";
+import {DRAFT_EVENT,LAST_ASSESSMENT,ScoreDraft,createDraftId,deleteDraft,draftKey,isUnassessed,stepMistakes,parseMistakes,persistDraft,readDrafts} from "@/lib/assessment-workspace";
 import {SCORE_SAVED_EVENT,submitScore} from "@/lib/score-client";
 
 type Context={classId:string;chapterId:string;subId:string;assessmentId:string};
@@ -22,9 +22,16 @@ export default function Assessment(){
   const [saving,setSaving]=useState<number[]>([]),[saveAllBusy,setSaveAllBusy]=useState(false);
   const [clearing,setClearing]=useState<Student|null>(null),[discarding,setDiscarding]=useState<Student|null>(null);
   const [reload,setReload]=useState(0),[initialReload,setInitialReload]=useState(0);
+  const [editingContext,setEditingContext]=useState(false);
   const volatile=useRef(new Map<string,ScoreDraft>()),locks=useRef(new Set<number>());
   const contextRef=useRef(context);contextRef.current=context;
   const inputRoot=useRef<HTMLElement>(null);
+  const focusedLink=useRef(false);
+  useEffect(()=>{
+    if(rowsLoading||!students.length||focusedLink.current)return;
+    const id=Number(new URLSearchParams(window.location.search).get("studentId"));
+    if(students.some(s=>s.id===id)){focusedLink.current=true;focusStudent(id)}
+  },[rowsLoading,students]);
   const toast=useToast();
   const refreshDrafts=useCallback(()=>{
     try{
@@ -105,6 +112,9 @@ export default function Assessment(){
   const currentDrafts=drafts.filter(x=>String(x.assessmentId)===context.assessmentId&&students.some(s=>s.id===x.studentId));
   const draftMap=Object.fromEntries(currentDrafts.map(x=>[x.studentId,x]));
   const assessed=students.filter(s=>scores[s.id]?.score!=null).length;
+  const remaining=students.length-assessed;
+  const savableDrafts=currentDrafts.filter(x=>x.status!=="conflict"&&parseMistakes(x.raw).valid);
+  const invalidDrafts=currentDrafts.filter(x=>!parseMistakes(x.raw).valid).length;
   const percent=students.length?Math.round(assessed/students.length*100):0;
   const visible=students.filter(s=>(s.name+" "+(s.nis??"")).toLocaleLowerCase("id").includes(query.trim().toLocaleLowerCase("id"))&&(filter==="all"||filter==="drafts"?filter!=="drafts"||!!draftMap[s.id]:isUnassessed(scores[s.id]?.score,draftMap[s.id])));
   function changeContext(next:Context){
@@ -118,6 +128,11 @@ export default function Assessment(){
     volatile.current.set(draft.key,draft);
     try{persistDraft(draft);volatile.current.delete(draft.key);setStorageError("")}catch{setStorageError("Draft belum tersimpan di perangkat. Jangan tutup halaman; aktifkan penyimpanan browser lalu coba lagi.")}
     refreshDrafts();
+  }
+  function adjust(studentId:number,delta:number){
+    const raw=draftMap[studentId]?.raw??(scores[studentId]?.mistakes==null?"0":String(scores[studentId].mistakes));
+    const next=stepMistakes(raw,delta);
+    if(next!==null)edit(studentId,next);
   }
   function focusStudent(id:number){
     requestAnimationFrame(()=>{const inputs=inputRoot.current?.querySelectorAll<HTMLInputElement>('input[data-student="'+id+'"]');const input=Array.from(inputs??[]).find(x=>x.getClientRects().length>0);input?.focus();input?.select()});
@@ -134,16 +149,17 @@ export default function Assessment(){
     try{
       const queued={...draft,status:"pending" as const,error:undefined};
       persistDraft(queued);volatile.current.delete(draft.key);setStorageError("");refreshDrafts();
+      if(advance&&nextIds.length)focusStudent(nextIds[0]);
       const ok=await submitScore(queued);
       if(ok&&!quiet)toast("Nilai berhasil disimpan.");
-      if(ok&&advance){if(nextIds.length)focusStudent(nextIds[0]);else setMessage("Siswa terakhir pada daftar ini selesai.")}
+      if(ok&&advance&&!nextIds.length)setMessage("Siswa terakhir pada daftar ini selesai.");
       return ok;
     }catch(e){setStorageError("Nilai belum dikirim: "+errorMessage(e));return false}
     finally{locks.current.delete(studentId);setSaving([...locks.current])}
   }
   async function saveAll(){
     setSaveAllBusy(true);let count=0;
-    try{for(const draft of currentDrafts.filter(x=>x.status!=="conflict"))if(await save(draft.studentId,false,true))count++;setMessage(count+" nilai tersimpan di server."+(count<currentDrafts.length?" Draft yang tersisa belum tersimpan; periksa status dan jumlah kesalahannya.":""))}finally{setSaveAllBusy(false)}
+    try{for(const draft of savableDrafts)if(await save(draft.studentId,false,true))count++;setMessage(count+" nilai tersimpan di server."+(count<currentDrafts.length?" Draft yang tersisa belum tersimpan; periksa status dan jumlah kesalahannya.":""))}finally{setSaveAllBusy(false)}
   }
   async function clearScore(){
     if(!clearing)return;
@@ -158,14 +174,14 @@ export default function Assessment(){
   function badge(student:Student){
     if(saving.includes(student.id))return <StatusBadge>Menyimpan…</StatusBadge>;
     const draft=draftMap[student.id];
-    if(draft){const labels={dirty:"Draft perangkat",pending:"Menunggu sinkronisasi",conflict:"Konflik · perlu ditinjau",failed:"Gagal disimpan"};return <StatusBadge tone={draft.status==="dirty"||draft.status==="pending"?"warning":"danger"}>{labels[draft.status]}</StatusBadge>}
+    if(draft){const labels={dirty:"Draft",pending:"Sinkronisasi",conflict:"Konflik",failed:"Gagal"};return <StatusBadge tone={draft.status==="dirty"||draft.status==="pending"?"warning":"danger"}>{labels[draft.status]}</StatusBadge>}
     return <StatusBadge tone={scores[student.id]?.score!=null?"success":"neutral"}>{scores[student.id]?.score!=null?"Tersimpan":"Belum dinilai"}</StatusBadge>;
   }
   function controls(student:Student,mode:string){
     const draft=draftMap[student.id],raw=draft?.raw??(scores[student.id]?.mistakes==null?"":String(scores[student.id].mistakes));
     const parsed=parseMistakes(raw),busy=saving.includes(student.id)||saveAllBusy;
     const errorId=mode+"-error-"+student.id;
-    return <div><div className="table-actions"><input data-student={student.id} aria-label={"Jumlah kesalahan "+student.name} aria-invalid={!parsed.valid} aria-describedby={!parsed.valid?errorId:"score-help"} value={raw} type="text" inputMode="numeric" autoComplete="off" disabled={busy} onChange={e=>edit(student.id,e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();if(draft)void save(student.id,true);else{const next=visible[visible.findIndex(x=>x.id===student.id)+1];if(next)focusStudent(next.id)}}}}/><button className="primary icon-button" title="Simpan nilai" aria-label={"Simpan nilai "+student.name} disabled={busy||!draft||!parsed.valid||draft.status==="conflict"} onClick={()=>void save(student.id)}><Check size={16}/></button>{draft?<button className="icon-button" title="Kembalikan ke nilai server" aria-label={"Kembalikan nilai "+student.name} disabled={busy} onClick={()=>setDiscarding(student)}><RotateCcw size={15}/></button>:scores[student.id]?.score!=null?<button className="ghost" disabled={busy} onClick={()=>setClearing(student)}>Kosongkan</button>:null}</div>{!parsed.valid&&<p className="row-error" id={errorId}>{parsed.error}</p>}{draft?.error&&<p className="row-error">{draft.error}</p>}</div>;
+    return <div><div className="score-editor"><div className="mistake-stepper"><button type="button" className="icon-button" title="Kurangi kesalahan" aria-label={"Kurangi kesalahan "+student.name} disabled={busy} onClick={()=>adjust(student.id,-1)}><Minus size={14}/></button><input data-student={student.id} aria-label={"Jumlah kesalahan "+student.name} aria-invalid={!parsed.valid} aria-describedby={!parsed.valid?errorId:"score-help"} value={raw} type="text" inputMode="numeric" autoComplete="off" disabled={busy} onChange={e=>edit(student.id,e.target.value)} onKeyDown={e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();adjust(student.id,e.key==="ArrowUp"?1:-1);return}if(e.key==="Enter"){e.preventDefault();if(draft)void save(student.id,true);else{const next=visible[visible.findIndex(x=>x.id===student.id)+1];if(next)focusStudent(next.id)}}}}/><button type="button" className="icon-button" title="Tambah kesalahan" aria-label={"Tambah kesalahan "+student.name} disabled={busy} onClick={()=>adjust(student.id,1)}><Plus size={14}/></button></div><div className="score-editor-actions"><button className="primary icon-button" title="Simpan & berikutnya" aria-label={"Simpan & berikutnya: "+student.name} disabled={busy||!draft||!parsed.valid||draft.status==="conflict"} onClick={()=>void save(student.id,true)}><Check size={16}/></button>{draft?<button className="icon-button" title="Kembalikan ke nilai server" aria-label={"Kembalikan nilai "+student.name} disabled={busy} onClick={()=>setDiscarding(student)}><RotateCcw size={15}/></button>:scores[student.id]?.score!=null?<button className="ghost icon-button" title="Kosongkan nilai" aria-label={"Kosongkan nilai "+student.name} disabled={busy} onClick={()=>setClearing(student)}><Eraser size={16}/></button>:null}</div></div>{draft&&raw.trim()===""&&<p className="row-error">Nilai akan dikosongkan saat disimpan.</p>}{!parsed.valid&&<p className="row-error" id={errorId}>{parsed.error}</p>}{draft?.error&&<p className="row-error">{draft.error}</p>}</div>;
   }
   function displayScore(student:Student){const parsed=parseMistakes(draftMap[student.id]?.raw??(scores[student.id]?.mistakes==null?"":String(scores[student.id].mistakes)));return parsed.valid?parsed.score??"—":"—"}
   const selectedClass=classes.find(x=>String(x.id)===context.classId);
@@ -174,27 +190,28 @@ export default function Assessment(){
   const exportQuery=new URLSearchParams({...(context.classId?{classId:context.classId}:{}),...(context.assessmentId?{assessmentId:context.assessmentId}:{})}).toString();
   return <main className="app assessment-page" ref={inputRoot}>
     <PageHeader eyebrow="Ruang kerja guru" title="Penilaian" description="Pilih materi, isi kesalahan, lalu lanjutkan ke siswa berikutnya."><details><summary className="button"><Download size={15}/>Ekspor nilai</summary><div className="actions section-gap"><a className="button" href={"/api/export?"+exportQuery}>Excel</a><a className="button" href={"/api/pdf?"+exportQuery}>PDF</a></div></details></PageHeader>
-    <section className="card assessment-context"><div className="section-heading"><h2>Kelas & materi</h2><span className="hint">Nilai = 90 − jumlah kesalahan</span></div>
+    <section className="card assessment-context"><div className="context-toggle"><div><strong>{selectedMaterial?"Materi penilaian":"Siapkan penilaian"}</strong>{selectedMaterial&&<p className="hint">{selectedClass?.name} · {selectedMaterial.title}</p>}</div>{selectedMaterial&&<button aria-expanded={editingContext} aria-controls="assessment-options" onClick={()=>setEditingContext(x=>!x)}>{editingContext?"Tutup pilihan":"Ubah pilihan"}</button>}</div><div id="assessment-options" hidden={!!selectedMaterial&&!editingContext}><div className="section-heading"><h2>Kelas & materi</h2><span className="hint">Nilai = 90 − jumlah kesalahan</span></div>
       {loading?<LoadingState/>:<div className="form-grid section-gap">
         <div className="field"><label htmlFor="assessment-class">Kelas</label><select id="assessment-class" value={context.classId} disabled={saving.length>0||saveAllBusy} onChange={e=>changeContext({...emptyContext,classId:e.target.value})}><option value="">Pilih kelas</option>{classes.map(x=><option key={x.id} value={x.id}>{x.name} · {x.academic_year_name} / {x.semester}</option>)}</select></div>
         <div className="field"><label htmlFor="assessment-chapter">Bab</label><select id="assessment-chapter" disabled={!context.classId||saving.length>0||saveAllBusy} value={context.chapterId} onChange={e=>changeContext({...context,chapterId:e.target.value,subId:"",assessmentId:""})}><option value="">Pilih bab</option>{availableChapters.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></div>
         <div className="field"><label htmlFor="assessment-sub">Subbab</label><select id="assessment-sub" disabled={!context.chapterId||optionsLoading||saving.length>0||saveAllBusy} value={context.subId} onChange={e=>changeContext({...context,subId:e.target.value,assessmentId:""})}><option value="">Pilih subbab</option>{subs.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></div>
-        <div className="field"><label htmlFor="assessment-material">Materi</label><select id="assessment-material" disabled={!context.subId||materialsLoading||saving.length>0||saveAllBusy} value={context.assessmentId} onChange={e=>changeContext({...context,assessmentId:e.target.value})}><option value="">Pilih materi</option>{materials.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></div>
+        <div className="field"><label htmlFor="assessment-material">Materi</label><select id="assessment-material" disabled={!context.subId||materialsLoading||saving.length>0||saveAllBusy} value={context.assessmentId} onChange={e=>{changeContext({...context,assessmentId:e.target.value});setEditingContext(false)}}><option value="">Pilih materi</option>{materials.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></div>
       </div>}
       {!loading&&context.classId&&!availableChapters.length&&<EmptyState title="Materi periode ini belum tersedia" action={<Link className="button" href="/master-data/curriculum">Susun materi <ArrowRight size={15}/></Link>}>Tambahkan bab dan materi untuk tahun ajaran kelas ini.</EmptyState>}
       {!loading&&!optionsLoading&&context.chapterId&&!subs.length&&!error&&<EmptyState title="Bab ini belum memiliki subbab" action={<Link className="button" href={"/master-data/curriculum/"+context.chapterId}>Tambah subbab</Link>}/>}
       {context.subId&&!materialsLoading&&subs.length>0&&!materials.length&&!error&&<p className="notice">Jika belum ada materi, tambahkan melalui menu Materi.</p>}
-    </section>
+    </div></section>
     {error&&<ErrorState message={error} onRetry={()=>{setError("");setInitialReload(x=>x+1);setReload(x=>x+1)}}/>}
     {storageError&&<Alert type="error">{storageError}</Alert>}
     {message&&<Alert>{message}</Alert>}
     {rowsLoading?<LoadingState label="Memuat daftar siswa dan nilai"/>:context.assessmentId&&context.classId&&!error?<section className="section-gap">
-      <div className="assessment-summary"><div><p className="eyebrow">{selectedClass?.name} · {selectedClass?.academic_year_name}</p><h2>{selectedMaterial?.title??"Daftar penilaian"}</h2><p>{assessed} dari {students.length} siswa tersimpan di server · {percent}% selesai</p><ProgressBar value={percent} label="Progress penilaian kelas"/></div><button className="primary" disabled={!currentDrafts.some(x=>x.status!=="conflict")||saving.length>0||saveAllBusy} onClick={()=>void saveAll()}><Save size={15}/>{saveAllBusy?"Menyimpan…":"Simpan semua draft ("+currentDrafts.length+")"}</button></div>
+      <div className="assessment-summary"><div><p className="eyebrow">{selectedClass?.name} · {selectedClass?.academic_year_name}</p><h2>{selectedMaterial?.title??"Daftar penilaian"}</h2><p>{assessed} dari {students.length} siswa tersimpan di server · {percent}% tersimpan</p><ProgressBar value={percent} label="Progres penilaian kelas"/></div><button className="primary" disabled={!savableDrafts.length||saving.length>0||saveAllBusy} onClick={()=>void saveAll()}><Save size={15}/>{saveAllBusy?"Menyimpan…":"Simpan draft valid ("+savableDrafts.length+")"}</button></div>
+      <div className="assessment-stats" aria-label="Ringkasan penilaian"><span><strong>{students.length}</strong> siswa</span><span><strong>{remaining}</strong> belum dinilai</span><span><strong>{currentDrafts.length}</strong> perubahan belum dikirim</span>{invalidDrafts>0&&<span className="danger"><strong>{invalidDrafts}</strong> perlu diperbaiki</span>}</div>
       <div className="toolbar"><SearchField label="Cari siswa" value={query} onChange={setQuery} placeholder="Cari nama atau NIS…"/><div className="segmented" role="group" aria-label="Status penilaian">{([["all","Semua"],["unassessed","Belum selesai"],["drafts","Draft"]] as const).map(([value,label])=><button key={value} type="button" aria-pressed={filter===value} onClick={()=>setFilter(value)}>{label}</button>)}</div></div>
-      <p className="hint" id="score-help"><kbd>Enter</kbd> simpan & lanjut. Angka 0 berarti tanpa kesalahan. Draft disimpan di browser ini; rekap hanya memakai nilai yang sudah terkirim.</p>
+      <p className="hint" id="score-help"><kbd>↑</kbd>/<kbd>↓</kbd> ubah kesalahan · <kbd>Enter</kbd> simpan & lanjut. 0 kesalahan = nilai 90. Input kosong = belum dinilai. Draft tersimpan di perangkat; rekap memakai nilai yang sudah dikirim.</p>
       {!students.length?<EmptyState title="Belum ada siswa di kelas ini" action={<Link className="button primary" href={"/students?classId="+context.classId}>Tambah siswa</Link>}>Daftarkan siswa aktif untuk mulai menilai.</EmptyState>:!visible.length?<EmptyState title={filter==="unassessed"&&!query?"Penilaian kelas ini sudah selesai":"Tidak ada siswa yang cocok"} action={<button onClick={()=>{setQuery("");setFilter("all")}}>Tampilkan semua siswa</button>}>Ubah pencarian atau filter untuk melihat daftar lainnya.</EmptyState>:<>
-        <div className="table-wrap score-table"><table><caption className="sr-only">Penilaian {selectedMaterial?.title}</caption><thead><tr><th scope="col">Siswa</th><th scope="col">Jumlah kesalahan</th><th scope="col">Nilai</th><th scope="col">Status</th></tr></thead><tbody>{visible.map(student=><tr key={student.id} data-dirty={!!draftMap[student.id]}><td><strong>{student.name}</strong><div className="hint">{student.nis||"NIS belum diisi"}</div></td><td>{controls(student,"desktop")}</td><td><span className="score-number">{displayScore(student)}</span></td><td>{badge(student)}</td></tr>)}</tbody></table></div>
-        <div className="score-mobile">{visible.map(student=><article className="score-row" key={student.id}><div className="score-row-header"><div><strong>{student.name}</strong><p className="hint">{student.nis||"NIS belum diisi"}</p></div><span className="score-number">{displayScore(student)}</span></div><div className="field"><span className="field-label">Jumlah kesalahan</span>{controls(student,"mobile")}</div><div className="section-gap">{badge(student)}</div></article>)}</div>
+        <div className="table-wrap score-table"><table><caption className="sr-only">Penilaian {selectedMaterial?.title}</caption><thead><tr><th scope="col" className="row-number">No</th><th scope="col">Siswa</th><th scope="col" className="mistakes-column">Kesalahan & tindakan</th><th scope="col" className="score-status-heading">Nilai & status</th></tr></thead><tbody>{visible.map((student,index)=><tr key={student.id} data-dirty={!!draftMap[student.id]}><td className="row-number">{index+1}</td><td className="student-cell"><strong>{student.name}</strong><div className="hint">{student.nis||"NIS belum diisi"}</div></td><td>{controls(student,"desktop")}</td><td className="score-status-cell"><div className="score-status"><span className="score-number">{displayScore(student)}</span>{badge(student)}</div></td></tr>)}</tbody></table></div>
+        <div className="score-mobile">{visible.map((student,index)=><article className="score-row" key={student.id} data-dirty={!!draftMap[student.id]}><div className="score-row-header"><div><span className="row-number">#{index+1}</span><strong>{student.name}</strong><p className="hint">{student.nis||"NIS belum diisi"}</p></div><div className="score-status"><span className="score-number">{displayScore(student)}</span>{badge(student)}</div></div><div className="field"><span className="field-label">Jumlah kesalahan</span>{controls(student,"mobile")}</div></article>)}</div>
       </>}
       <div className="save-summary"><span>{visible.length} siswa ditampilkan · {currentDrafts.length} draft pada materi ini</span>{currentDrafts.length>0&&<span>Draft akan dipulihkan saat Anda kembali.</span>}</div>
     </section>:!loading&&!error&&<EmptyState title="Siap mulai menilai" >Pilih kelas dan materi di atas. Pilihan terakhir akan diingat untuk pekerjaan berikutnya.</EmptyState>}

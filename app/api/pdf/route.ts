@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsPDF } from "jspdf";
 import { db } from "@/lib/db";
-import { reportRows } from "@/lib/report-query";
+import { reportRows, reportScope } from "@/lib/report-query";
 import { averageStats, groupAverageRows, type AveragedRow, type ReportRow } from "@/lib/report-groups";
 
 const green = [23, 107, 87] as const;
@@ -16,27 +16,9 @@ function settings() {
   return Object.fromEntries(rows.map((row) => [row.key, row.value])) as Record<string, string>;
 }
 
-function lookup<T>(query: string, id: number) {
-  return id > 0 ? (db.prepare(query).get(id) as T | undefined) : undefined;
-}
-
-function filterLabel(req: Request) {
-  const params = new URL(req.url).searchParams;
-  const year = lookup<{ name: string; semester: string }>("SELECT name,semester FROM academic_years WHERE id=?", Number(params.get("academicYearId")));
-  const schoolClass = lookup<{ name: string }>("SELECT name FROM classes WHERE id=?", Number(params.get("classId")));
-  const material = lookup<{ chapter: string; subchapter: string; title: string }>(
-    "SELECT ch.title chapter,sub.title subchapter,a.title FROM assessments a JOIN subchapters sub ON sub.id=a.subchapter_id JOIN chapters ch ON ch.id=sub.chapter_id WHERE a.id=?",
-    Number(params.get("assessmentId")),
-  );
-  return [
-    year ? `Tahun ajaran: ${year.name} · ${year.semester}` : "Semua tahun ajaran",
-    schoolClass ? `Kelas: ${schoolClass.name}` : "Semua kelas",
-    material ? `Bab/Materi: ${material.chapter}` : "Semua Bab/Materi",
-  ].join(" | ");
-}
-
 export async function GET(req: Request) {
-  const rows = reportRows(req) as ReportRow[];
+  const rows = reportRows(req);
+
   const groups = groupAverageRows(rows);
   const averagedRows = groups.flatMap((group) => group.classes.flatMap((classGroup) => classGroup.rows));
   const overall = averageStats(averagedRows);
@@ -73,7 +55,7 @@ export async function GET(req: Request) {
     doc.setDrawColor(...border);
     doc.line(left, 31, right, 31);
     doc.setFontSize(8);
-    const filters = doc.splitTextToSize(filterLabel(req), right - left);
+    const filters = doc.splitTextToSize(reportScope(req), right - left);
     doc.text(filters, left, 37);
     y = 39 + filters.length * 4 + 4;
   };
@@ -132,7 +114,7 @@ export async function GET(req: Request) {
     doc.text(`Jumlah nilai: ${result.total}`, left + 3, y + 1);
     doc.text(`Rata-rata: ${result.average ?? "-"}`, left + 58, y + 1);
     doc.setFont("helvetica", "normal");
-    doc.text(`Dinilai: ${result.scored}/${classRows.length}`, right - 3, y + 1, { align: "right" });
+    doc.text(`Dinilai: ${result.scored}/${classRows.reduce((n,r)=>n+r.totalItems,0)}`, right - 3, y + 1, { align: "right" });
     y += 12;
   };
 
@@ -190,14 +172,14 @@ export async function GET(req: Request) {
     y += 12;
     doc.setFontSize(8.5);
     doc.setTextColor(...ink);
-    doc.text(`Jumlah data: ${rows.length}`, left + 3, y);
+    doc.text(`Jumlah data: ${rows.filter(row=>row.assessment_id!==null).length}`, left + 3, y);
     doc.text(`Sudah dinilai: ${overall.scored}`, left + 70, y);
-    doc.text(`Belum dinilai: ${averagedRows.length - overall.scored}`, left + 125, y);
+    doc.text(`Belum dinilai: ${rows.filter(row=>row.assessment_id!==null).length - overall.scored}`, left + 125, y);
     y += 7;
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...green);
     doc.text(`Jumlah nilai: ${overall.total}`, left + 3, y);
-    doc.text(`Rata-rata nilai: ${overall.average ?? "-"}`, left + 70, y);
+    doc.text(`Rata-rata berbobot: ${overall.average ?? "-"}`, left + 70, y);
   }
   footer();
 

@@ -4,11 +4,11 @@ import {ColumnDef,SortingState,flexRender,getCoreRowModel,getPaginationRowModel,
 import {ArrowDown,ArrowUp,ArrowUpDown,ChevronLeft,ChevronRight} from "lucide-react";
 import {EmptyState} from "./ui";
 
-export function DataTable<T extends {id:number}>({data,columns,label,mobileRow,emptyAction,initialSort="name"}:{data:T[];columns:ColumnDef<T>[];label:string;mobileRow:(row:T)=>ReactNode;emptyAction?:ReactNode;initialSort?:string}) {
+export function DataTable<T extends {id:number}>({data,columns,label,mobileRow,emptyAction,initialSort="name",defaultCompact=false}:{data:T[];columns:ColumnDef<T>[];label:string;mobileRow:(row:T)=>ReactNode;emptyAction?:ReactNode;initialSort?:string;defaultCompact?:boolean}) {
   const id=useId();
   const [sorting,setSorting]=useState<SortingState>([{id:initialSort,desc:false}]);
   const [pagination,setPagination]=useState({pageIndex:0,pageSize:20});
-  const [compact,setCompact]=useState(false);
+  const [compact,setCompact]=useState(defaultCompact);
   useEffect(()=>{setPagination(p=>({...p,pageIndex:0}))},[data]);
   const table=useReactTable({data,columns,state:{sorting,pagination},onSortingChange:setSorting,onPaginationChange:setPagination,getCoreRowModel:getCoreRowModel(),getSortedRowModel:getSortedRowModel(),getPaginationRowModel:getPaginationRowModel(),getRowId:row=>String(row.id),autoResetPageIndex:false});
   const sortColumns=table.getAllLeafColumns().filter(c=>c.getCanSort());
