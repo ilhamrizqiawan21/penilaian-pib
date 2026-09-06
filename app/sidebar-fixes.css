@@ -1,31 +1,3 @@
-/* Final collapsed-sidebar overrides: kept separate so they remain last in the cascade. */
-.sidebar.collapsed{width:82px;padding:18px 9px 20px}
-.sidebar.collapsed .brand{height:58px;margin:0 0 10px;padding:0;display:grid;place-items:center}
-.sidebar.collapsed .brand:before{width:62px;height:50px;border-radius:12px;font-size:20px!important}
-.sidebar.collapsed .sidebar-toggle{position:relative;top:auto;right:auto;width:44px;height:36px;margin:0 auto 20px!important;padding:7px;display:grid;place-content:center;gap:4px}
-.sidebar.collapsed .sidebar-toggle i,.sidebar.collapsed .sidebar-toggle i:nth-child(1),.sidebar.collapsed .sidebar-toggle i:nth-child(2),.sidebar.collapsed .sidebar-toggle i:nth-child(3){transform:none!important;opacity:1!important}
-.sidebar.collapsed nav>div{margin-bottom:14px}
-.sidebar.collapsed nav a{justify-content:center;width:64px;margin:0 auto;padding:8px 0}
-.sidebar.collapsed nav a:before{content:none!important}
-.sidebar.collapsed nav>div:nth-child(1) a:nth-child(1):before{content:"⌂"!important}.sidebar.collapsed nav>div:nth-child(1) a:nth-child(2):before{content:"✎"!important}.sidebar.collapsed nav>div:nth-child(1) a:nth-child(3):before{content:"▥"!important}
-.sidebar.collapsed nav>div:nth-child(2) a:nth-child(1):before{content:"⚙"!important}.sidebar.collapsed nav>div:nth-child(2) a:nth-child(2):before{content:"▦"!important}.sidebar.collapsed nav>div:nth-child(2) a:nth-child(3):before{content:"♙"!important}.sidebar.collapsed nav>div:nth-child(2) a:nth-child(4):before{content:"▤"!important}
-.sidebar.collapsed nav>div:nth-child(3) a:nth-child(1):before{content:"⇩"!important}.sidebar.collapsed nav>div:nth-child(3) a:nth-child(2):before{content:"◎"!important}
-:root[data-sidebar="collapsed"] .content{margin-left:82px}
-@media(max-width:700px){.sidebar.collapsed{width:82px}:root[data-sidebar="collapsed"] .content{margin-left:0}}
-.sidebar .nav-icon{display:inline-grid;place-items:center;width:22px;margin-right:10px;font-size:16px;line-height:1;color:#9fcac0}
-.sidebar a.active .nav-icon,.sidebar a:hover .nav-icon{color:#fff}
-.sidebar.collapsed .nav-icon{width:64px;height:38px;margin:0;font-size:19px;color:#a9cec5}
-.sidebar.collapsed .nav-text{display:none}
-.sidebar.collapsed nav a:before{display:none!important;content:none!important}
-.sidebar.collapsed .brand:before{font-size:20px!important}
-.sidebar.collapsed .sidebar-toggle{top:auto;right:auto}
-.sidebar{transition:width .24s cubic-bezier(.2,.75,.25,1),padding .24s ease,box-shadow .24s ease}
-.sidebar .brand{transition:padding .24s ease,transform .24s ease}
-.sidebar .nav-label,.sidebar .nav-text,.sidebar .logout{transition:opacity .16s ease,transform .2s ease}
-.sidebar .nav-icon{transition:width .22s ease,margin .22s ease,font-size .22s ease,transform .2s ease}
-.sidebar.collapsed .brand{transform:scale(.98)}
-.sidebar.collapsed .nav-icon{transform:scale(1.04)}
-:root[data-sidebar="expanded"] .content{transition:margin-left .24s cubic-bezier(.2,.75,.25,1)}
 body{background:radial-gradient(circle at 90% 0%,#e7f3ee 0,transparent 34%),linear-gradient(135deg,#f5f8f6 0%,#eef3f0 100%);color:#17202d}
 .content{min-height:100vh}
 .app{padding-top:48px;padding-bottom:80px}

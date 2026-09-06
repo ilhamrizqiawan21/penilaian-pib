@@ -2,7 +2,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {useEffect,useState} from "react";
-import {School} from "lucide-react";
+import BrandLogo from "./brand-logo";
 import {api} from "@/lib/client-api";
 import {Settings} from "@/lib/frontend-types";
 import Sidebar from "./sidebar";
@@ -14,7 +14,7 @@ function WorkspaceHeader(){
     update();void api<{user:{name:string}}>("/api/auth/me").then(x=>setName(x.user.name)).catch(()=>undefined);
     window.addEventListener("pib-settings-change",update);return()=>window.removeEventListener("pib-settings-change",update);
   },[]);
-  return <header className="app-topbar"><div className="topbar-school"><School size={19} color="var(--brand)" aria-hidden="true"/><span>{school}</span></div><div className="topbar-right"><span>Ruang kerja guru</span><Link className="avatar" href="/account" aria-label={"Akun "+name} title={name}>{name.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase()}</Link></div></header>;
+  return <header className="app-topbar"><div className="topbar-school"><BrandLogo/><span>{school}</span></div><div className="topbar-right"><span>Ruang kerja guru</span><Link className="avatar" href="/account" aria-label={"Akun "+name} title={name}>{name.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase()}</Link></div></header>;
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

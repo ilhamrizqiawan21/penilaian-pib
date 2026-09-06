@@ -2,10 +2,11 @@
 import Link from "next/link";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {ColumnDef} from "@tanstack/react-table";
-import {Download,Plus,Upload,Users} from "lucide-react";
+import {Download,Plus,Trash2,Upload,Users} from "lucide-react";
 import {api,errorMessage,jsonRequest} from "@/lib/client-api";
 import {SchoolClass,Student} from "@/lib/frontend-types";
 import {ImportRow,importRowError,parseStudentCsv} from "@/lib/student-import";
+import {deleteDraft,readDrafts} from "@/lib/assessment-workspace";
 import {Alert,ConfirmDialog,EmptyState,ErrorState,LoadingState,Modal,PageHeader,SearchField,StatusBadge,useToast} from "@/app/ui";
 import {DataTable} from "@/app/data-table";
 
@@ -13,7 +14,7 @@ export default function Students(){
   const [students,setStudents]=useState<Student[]>([]),[classes,setClasses]=useState<SchoolClass[]>([]);
   const [query,setQuery]=useState(""),[classId,setClassId]=useState("");
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[formError,setFormError]=useState("");
-  const [editor,setEditor]=useState<Student|"new"|null>(null),[removing,setRemoving]=useState<Student|null>(null),[importing,setImporting]=useState(false);
+  const [editor,setEditor]=useState<Student|"new"|null>(null),[removing,setRemoving]=useState<Student|null>(null),[deleting,setDeleting]=useState<Student|null>(null),[importing,setImporting]=useState(false);
   const [preview,setPreview]=useState<ImportRow[]>([]),[importMessage,setImportMessage]=useState(""),[fileName,setFileName]=useState("");
   const fileInput=useRef<HTMLInputElement>(null),toast=useToast();
   const load=useCallback(async()=>{
@@ -32,6 +33,11 @@ export default function Students(){
   async function remove(){
     if(!removing)return;setBusy(true);setFormError("");
     try{await api("/api/students?id="+removing.id,{method:"DELETE"});setRemoving(null);toast("Siswa dinonaktifkan. Riwayat nilai tetap tersimpan.");await load()}catch(e){setError(errorMessage(e));setRemoving(null)}finally{setBusy(false)}
+  }
+  async function permanentlyDelete(){
+    if(!deleting)return;setBusy(true);
+    try{const result=await api<{deletedScores:number}>("/api/students?id="+deleting.id+"&permanent=1",{method:"DELETE"});for(const draft of readDrafts().filter(draft=>draft.studentId===deleting.id))deleteDraft(draft.key);setDeleting(null);toast(result.deletedScores?`Siswa dan ${result.deletedScores} nilai berhasil dihapus.`:"Siswa berhasil dihapus.");await load()}
+    catch(e){toast(errorMessage(e));setDeleting(null)}finally{setBusy(false)}
   }
   async function readFile(file?:File){
     if(!file)return;setBusy(true);setFormError("");setPreview([]);setImportMessage("");setFileName(file.name);
@@ -61,7 +67,7 @@ export default function Students(){
   }
   const rows=useMemo(()=>students.filter(s=>(!classId||String(s.class_id)===classId)&&(s.name+" "+(s.nis??"")+" "+s.class_name).toLowerCase().includes(query.trim().toLowerCase())),[students,classId,query]);
   const startEdit=(s:Student|"new")=>{setFormError("");setEditor(s)};
-  const rowActions=(s:Student)=><div className="table-actions"><button type="button" onClick={()=>startEdit(s)} aria-label={"Edit "+s.name}>Edit</button><button type="button" className="ghost" onClick={()=>setRemoving(s)} aria-label={"Nonaktifkan "+s.name}>Nonaktifkan</button></div>;
+  const rowActions=(s:Student)=><div className="table-actions"><button type="button" onClick={()=>startEdit(s)} aria-label={"Edit "+s.name}>Edit</button><button type="button" className="ghost" onClick={()=>setRemoving(s)} aria-label={"Nonaktifkan "+s.name}>Nonaktifkan</button><button type="button" className="danger" onClick={()=>setDeleting(s)} aria-label={"Hapus "+s.name}><Trash2 size={14} aria-hidden="true"/>Hapus</button></div>;
   const columns:ColumnDef<Student>[]=[
     {accessorKey:"name",header:"Nama siswa",cell:({row})=><strong>{row.original.name}</strong>},
     {accessorKey:"nis",header:"NIS",cell:({row})=>row.original.nis||"—"},
@@ -80,5 +86,6 @@ export default function Students(){
     {editor&&<Modal title={existing?"Edit siswa":"Tambah siswa"} busy={busy} onClose={()=>setEditor(null)}><form className="section-stack" aria-busy={busy} onSubmit={submit}><div className="field"><label htmlFor="student-name">Nama lengkap</label><input id="student-name" name="name" defaultValue={existing?.name??""} required minLength={2} maxLength={120} autoComplete="off"/></div><div className="field"><label htmlFor="student-class">Kelas</label><select id="student-class" name="classId" defaultValue={existing?.class_id??classId} required><option value="">Pilih kelas</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name} · {c.academic_year_name} / {c.semester}</option>)}</select></div><div className="field"><label htmlFor="student-nis">NIS <span className="hint">(opsional)</span></label><input id="student-nis" name="nis" defaultValue={existing?.nis??""} maxLength={30}/></div><div className="field"><label htmlFor="student-gender">Gender</label><select id="student-gender" name="gender" defaultValue={existing?.gender??""}><option value="">Belum diisi</option><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div>{formError&&<Alert type="error">{formError}</Alert>}<div className="modal-footer"><button type="button" disabled={busy} onClick={()=>setEditor(null)}>Batal</button><button className="primary" disabled={busy||!classes.length}>{busy?"Menyimpan…":existing?"Simpan perubahan":"Tambah siswa"}</button></div></form></Modal>}
     {importing&&<Modal title="Impor siswa" busy={busy} onClose={()=>setImporting(false)}><p>Gunakan template PIB. Isi ID kelas, NIS, nama, dan gender. Periksa hasil sebelum mengimpor.</p><div className="actions"><a className="button" href="/api/students/template"><Download size={15}/>Unduh template XLSX</a><button type="button" disabled={busy} onClick={()=>fileInput.current?.click()}><Upload size={15}/>{busy?"Membaca…":"Pilih CSV / XLSX"}</button><input ref={fileInput} type="file" accept=".csv,.xlsx" hidden onChange={e=>void readFile(e.target.files?.[0])}/></div><details className="detail-panel"><summary>Lihat ID kelas</summary><ul>{classes.map(c=><li key={c.id}>{c.id} — {c.name} · {c.academic_year_name} / {c.semester}</li>)}</ul></details>{fileName&&<p className="hint">File: {fileName}</p>}{formError&&<Alert type="error">{formError}</Alert>}{importMessage&&<Alert type="success">{importMessage}</Alert>}{preview.length>0&&<><p>{preview.length-invalid} baris valid · {invalid} perlu diperbaiki</p><DataTable data={previewRows} columns={previewColumns} label="Baris impor" mobileRow={r=><><h3>{r.name||"Nama kosong"}</h3><p>Kelas {r.classId} · NIS {r.nis||"—"}</p><StatusBadge tone={r.error?"danger":"success"}>{r.error||"Siap diimpor"}</StatusBadge></>}/><div className="modal-footer"><button disabled={busy} onClick={()=>setPreview([])}>Batalkan pratinjau</button><button className="primary" disabled={busy||invalid>0} onClick={()=>void commitImport()}>{busy?"Mengimpor…":"Impor "+preview.length+" siswa"}</button></div></>}</Modal>}
     {removing&&<ConfirmDialog title="Nonaktifkan siswa?" onClose={()=>setRemoving(null)} onConfirm={()=>void remove()} confirmLabel="Nonaktifkan" busy={busy}>{removing.name} tidak akan muncul pada input baru. Riwayat nilai tetap tersimpan.</ConfirmDialog>}
+    {deleting&&<ConfirmDialog title="Hapus siswa dan seluruh nilainya?" onClose={()=>setDeleting(null)} onConfirm={()=>void permanentlyDelete()} confirmLabel="Ya, hapus semuanya" busy={busy}><strong>{deleting.name}</strong> akan dihapus permanen. Seluruh nilai yang pernah dimasukkan untuk siswa ini juga akan dihapus dari Penilaian, Rekap, laporan, dan ekspor. Tindakan ini tidak dapat dipulihkan.</ConfirmDialog>}
   </main>;
 }

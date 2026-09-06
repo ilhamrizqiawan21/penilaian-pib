@@ -1,13 +1,15 @@
 "use client";
 import Link from "next/link";
+import BrandLogo from "./brand-logo";
 import {usePathname,useRouter} from "next/navigation";
 import {useEffect,useRef,useState} from "react";
 import {api,errorMessage} from "@/lib/client-api";
-import {House,SquarePen,ChartColumn,School,LayoutGrid,Users,BookOpen,Download,UserRound,Menu,LogOut,X} from "lucide-react";
+import {House,SquarePen,ChartColumn,School,LayoutGrid,Users,BookOpen,Download,UserRound,Menu,LogOut,X,PanelLeftClose,PanelLeftOpen} from "lucide-react";
+import {useToast} from "./ui";
 
 const groups = [
   ["Kerja harian", [["/dashboard", "Beranda", "home"], ["/assessment", "Penilaian", "edit"], ["/recap", "Rekap", "chart"]]],
-  ["Kelola data", [["/master-data", "Sekolah & tahun", "school"], ["/classes", "Kelas", "grid"], ["/students", "Siswa", "users"], ["/master-data/curriculum", "Materi", "book"]]],
+  ["Kelola data", [["/master-data", "Sekolah & periode", "school"], ["/classes", "Kelas", "grid"], ["/students", "Siswa", "users"], ["/master-data/curriculum", "Materi", "book"]]],
   ["Laporan", [["/reports", "Ekspor & backup", "download"], ["/account", "Akun", "user"]]],
 ] as const;
 const mobile = groups[0][1];
@@ -17,7 +19,8 @@ function NavIcon({name}:{name:keyof typeof icons}){const Icon=icons[name];return
 
 export default function Sidebar() {
   const path = usePathname(), router = useRouter();
-  const [busy,setBusy] = useState(false), [error,setError] = useState("");
+  const toast=useToast();
+  const [busy,setBusy] = useState(false);
   const [collapsed,setCollapsed] = useState(false), [ready,setReady] = useState(false);
   const [moreOpen,setMoreOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -52,26 +55,25 @@ export default function Sidebar() {
     };
   }, [moreOpen]);
   async function logout() {
-    setBusy(true); setError("");
+    setBusy(true);
     try {
       await api("/api/auth/logout", {method:"POST"});
       setMoreOpen(false); router.replace("/login"); router.refresh();
-    } catch (e) { setError(errorMessage(e)); setBusy(false); }
+    } catch (e) { toast(`Gagal keluar: ${errorMessage(e)}`); setBusy(false); }
   }
   const moreActive = !mobile.some(([href]) => active(path, href));
   return <>
-    <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
-      <div className="brand">PIB<span>Penilaian guru · lokal</span></div>
-      <button className="sidebar-toggle" type="button" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? "Buka sidebar" : "Tutup sidebar"} aria-expanded={!collapsed} title={collapsed ? "Buka sidebar" : "Tutup sidebar"}><i/><i/><i/></button>
+    <aside id="app-sidebar" className={`sidebar${collapsed ? " collapsed" : ""}`}>
+      <div className="brand"><BrandLogo/><div className="brand-copy">PIB<span>Penilaian guru · lokal</span></div></div>
+      <button className="sidebar-toggle" type="button" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? "Buka sidebar" : "Tutup sidebar"} aria-controls="app-sidebar" aria-expanded={!collapsed}>{collapsed?<PanelLeftOpen size={19} aria-hidden="true"/>:<PanelLeftClose size={19} aria-hidden="true"/>}</button>
       <nav aria-label="Navigasi utama">
         {groups.map(([label,items]) => <div key={label}>
           <p className="nav-label">{label}</p>
           {items.map(([href,name,icon]) => <Link className={active(path,href) ? "active" : ""} aria-label={name} title={collapsed ? name : undefined} aria-current={active(path,href) ? "page" : undefined} href={href} key={href}>
-            <span className="nav-icon"><NavIcon name={icon}/></span><span className="nav-text">{name}</span>
+            <span className="nav-icon"><NavIcon name={icon}/></span><span className="nav-text">{name}</span><span className="nav-tooltip" role="tooltip">{name}</span>
           </Link>)}
         </div>)}
-        {error && <p className="alert error" role="alert">{error}</p>}
-        <button className="logout" onClick={logout} disabled={busy} aria-label="Keluar aplikasi" title={collapsed ? "Keluar aplikasi" : undefined}><span className="nav-icon"><NavIcon name="logout"/></span><span className="nav-text">{busy ? "Keluar…" : "Keluar aplikasi"}</span></button>
+        <button className="logout" onClick={logout} disabled={busy} aria-label="Keluar aplikasi"><span className="nav-icon"><NavIcon name="logout"/></span><span className="nav-text">{busy ? "Keluar…" : "Keluar aplikasi"}</span><span className="nav-tooltip" role="tooltip">Keluar aplikasi</span></button>
       </nav>
     </aside>
     <nav className="mobile-nav" aria-label="Navigasi utama">
@@ -84,9 +86,8 @@ export default function Sidebar() {
         if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) setMoreOpen(false);
       }
     }}>
-      <header className="mobile-menu-header"><div><p className="eyebrow">PIB Penilaian</p><h2 id="mobile-menu-title">Semua menu</h2></div><button type="button" className="icon-button" aria-label="Tutup menu" onClick={() => setMoreOpen(false)}><NavIcon name="close"/></button></header>
+      <header className="mobile-menu-header"><div className="mobile-menu-brand"><BrandLogo/><div><p className="eyebrow">PIB Penilaian</p><h2 id="mobile-menu-title">Semua menu</h2></div></div><button type="button" className="icon-button" aria-label="Tutup menu" onClick={() => setMoreOpen(false)}><NavIcon name="close"/></button></header>
       <nav aria-label="Semua menu aplikasi">{groups.map(([label,items]) => <section className="mobile-menu-group" key={label}><h3>{label}</h3><div>{items.map(([href,name,icon]) => <Link href={href} key={href} className={active(path,href) ? "active" : ""} aria-current={active(path,href) ? "page" : undefined} onClick={() => setMoreOpen(false)}><NavIcon name={icon}/><span>{name}</span>{active(path,href) && <span className="sr-only">Halaman saat ini</span>}</Link>)}</div></section>)}</nav>
-      {error && <p className="alert error" role="alert">{error}</p>}
       <button className="mobile-menu-logout" type="button" onClick={logout} disabled={busy}><NavIcon name="logout"/>{busy ? "Keluar…" : "Keluar aplikasi"}</button>
     </dialog>
   </>;

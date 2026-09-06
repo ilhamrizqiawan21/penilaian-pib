@@ -15,7 +15,7 @@ describe("report groups", () => {
       expect.objectContaining({ name: "Ani", average: 85, assessed: 2, totalItems: 2, status: "Dinilai" }),
       expect.objectContaining({ name: "Budi", average: 70, assessed: 1, totalItems: 2, status: "Sebagian dinilai" }),
     ]);
-    expect(averageStats(rows)).toEqual({ scored: 2, total: 155, average: 77.5 });
+    expect(averageStats(rows)).toEqual({ scored: 3, total: 240, average: 80 });
   });
 
   it("menandai siswa tanpa nilai sebagai belum dinilai", () => {
