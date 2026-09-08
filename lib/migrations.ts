@@ -22,6 +22,12 @@ CREATE INDEX IF NOT EXISTS idx_scores_student_assessment ON scores(student_id,as
 CREATE INDEX IF NOT EXISTS idx_assessments_subchapter_active ON assessments(subchapter_id,is_active);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 `) },
+  { version: 3, name: "individual_test_sessions", up: (db) => db.exec(`
+CREATE TABLE IF NOT EXISTS individual_test_sessions(id INTEGER PRIMARY KEY AUTOINCREMENT,student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,status TEXT NOT NULL DEFAULT 'ACTIVE',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,completed_at TEXT);
+CREATE TABLE IF NOT EXISTS individual_test_session_items(id INTEGER PRIMARY KEY AUTOINCREMENT,session_id INTEGER NOT NULL REFERENCES individual_test_sessions(id) ON DELETE CASCADE,assessment_id INTEGER NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,display_order INTEGER NOT NULL,UNIQUE(session_id,assessment_id),UNIQUE(session_id,display_order));
+CREATE INDEX IF NOT EXISTS idx_individual_sessions_student ON individual_test_sessions(student_id,status);
+CREATE INDEX IF NOT EXISTS idx_individual_session_items_session ON individual_test_session_items(session_id,display_order);
+`) },
 ];
 export function runMigrations(db: Database.Database) {
   db.exec("CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");

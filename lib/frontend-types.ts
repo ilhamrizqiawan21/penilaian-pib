@@ -6,3 +6,6 @@ export interface Subchapter{id:number;title:string;chapter_id?:number}
 export interface Assessment{id:number;title:string;subchapter_id?:number;weight:number}
 export interface ScoreRow{id?:number;student_id:number;mistakes:number|null;score:number|null}
 export interface Settings{schoolName?:string;schoolAddress?:string;teacherName?:string}
+export type IndividualSessionStatus="ACTIVE"|"COMPLETED"|"CANCELLED";
+export interface IndividualTestSessionItem{id:number;assessment_id:number;title:string;chapter:string;subchapter:string;display_order:number;score:number|null;mistakes:number|null;updated_at?:string|null}
+export interface IndividualTestSession{id:number;student_id:number;class_id:number;status:IndividualSessionStatus;created_at:string;updated_at:string;completed_at?:string|null;student_name?:string;class_name?:string;items:IndividualTestSessionItem[]}
