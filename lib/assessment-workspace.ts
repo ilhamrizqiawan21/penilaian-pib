@@ -1,6 +1,6 @@
 export type DraftStatus="dirty"|"pending"|"conflict"|"failed";
 export type ScoreDraft={key:string;studentId:number;assessmentId:number;raw:string;id:string;deviceId:string;baseUpdatedAt?:string|null;status:DraftStatus;error?:string};
-export function parseMistakes(raw:string):{valid:true;mistakes:number|null;score:number|null}|{valid:false;error:string} {
+export function parseMistakes(raw:string):{valid:true;mistakes:number|null;score:number|null}|{valid:false;error:string;score?:never} {
   if(raw.trim()==="")return {valid:true,mistakes:null,score:null};
   const value=Number(raw);
   if(!/^\d+$/.test(raw.trim())||!Number.isInteger(value)||value<0||value>90)return {valid:false,error:"Isi bilangan bulat 0–90."};

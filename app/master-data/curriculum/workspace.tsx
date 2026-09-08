@@ -2,10 +2,10 @@
 import Link from "next/link";
 import {useParams,useRouter,useSearchParams} from "next/navigation";
 import {Suspense,useEffect,useState} from "react";
-import {ArrowUp,ArrowDown,Plus,Pencil,Copy} from "lucide-react";
+import {ArrowUp,ArrowDown,Plus,Pencil,Copy,Trash2} from "lucide-react";
 import {api,errorMessage,jsonRequest} from "@/lib/client-api";
 import {chapterInput,subchapterInput,materialInput,curriculumEdit,type CurriculumKind,type CurriculumContext,type CurriculumItem,type CurriculumPeriod,type CopyPreview} from "@/lib/curriculum-schema";
-import {Alert,Breadcrumb,EmptyState,ErrorState,LoadingState,Modal,PageHeader,SearchField,StatusBadge,useToast} from "@/app/ui";
+import {Alert,Breadcrumb,ConfirmDialog,EmptyState,ErrorState,LoadingState,Modal,PageHeader,SearchField,StatusBadge,useToast} from "@/app/ui";
 
 const labels:Record<CurriculumKind,string>={chapters:"Bab",subchapters:"subbab",assessments:"materi"};
 const base="/master-data/curriculum";
@@ -14,7 +14,7 @@ function Workspace(){
   const route=useParams<{chapterId?:string;subchapterId?:string}>(),params=useSearchParams(),router=useRouter(),toast=useToast();
   const [years,setYears]=useState<CurriculumPeriod[]>([]),[yearError,setYearError]=useState(""),[yearRetry,setYearRetry]=useState(0),[yearsLoading,setYearsLoading]=useState(true);
   const [context,setContext]=useState<CurriculumContext|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState(""),[revision,setRevision]=useState(0);
-  const [query,setQuery]=useState(""),[editor,setEditor]=useState<{item?:CurriculumItem}|null>(null),[copying,setCopying]=useState(false),[busy,setBusy]=useState(false);
+  const [query,setQuery]=useState(""),[editor,setEditor]=useState<{item?:CurriculumItem}|null>(null),[copying,setCopying]=useState(false),[deleting,setDeleting]=useState<CurriculumItem|null>(null),[busy,setBusy]=useState(false);
   const yearParam=params.get("year")??params.get("academicYearId")??"";
   const kind:CurriculumKind=route.subchapterId?"assessments":route.chapterId?"subchapters":"chapters";
   useEffect(()=>{
@@ -45,6 +45,7 @@ function Workspace(){
     try{await api("/api/curriculum",jsonRequest("POST",{action:"move",kind,id:item.id,direction}));setRevision(x=>x+1);toast("Urutan diperbarui.")}
     catch(e){setError(errorMessage(e))}finally{setBusy(false)}
   }
+  async function remove(){if(!deleting)return;setBusy(true);setError("");try{await api(`/api/master/${kind}/${deleting.id}?permanent=1`,{method:"DELETE"});setDeleting(null);setRevision(x=>x+1);toast(labels[kind]+" berhasil dihapus.")}catch(e){setError(errorMessage(e));setDeleting(null)}finally{setBusy(false)}}
   return <main className="app curriculum-workspace">
     {route.chapterId&&<Breadcrumb items={[{label:"Materi",href:home},...(context?.chapter?[{label:context.chapter.title,href:route.subchapterId?chapterHref:undefined}]:[]),...(context?.subchapter?[{label:context.subchapter.title}]:[])]}/>}
     <PageHeader eyebrow="Kelola materi" title={context?.subchapter?.title??context?.chapter?.title??"Materi PIB"} description={route.chapterId?periodLabel:"Susun Bab, subbab, materi, dan pedoman penilaian per periode."}>
@@ -67,10 +68,11 @@ function Workspace(){
           <p className="hint">{kind==="chapters"?item.subchapter_count+" subbab · "+item.material_count+" materi":kind==="subchapters"?item.material_count+" materi":"Bobot "+item.weight+" · "+item.score_count+" nilai tersimpan"}</p>
           {kind==="assessments"&&(item.description?<details className="cu-guide"><summary>Pedoman tersedia</summary><p>{item.description}</p></details>:<span className="hint">Pedoman belum diisi</span>)}
           {item.legacy_mismatch&&<StatusBadge tone="warning">Tinjau periode lama</StatusBadge>}
-        </div><div className="cu-actions"><button disabled={busy} onClick={()=>setEditor({item})} aria-label={"Edit "+item.title}><Pencil size={13}/>Edit</button><button className="icon-button" title="Naik" aria-label={"Naikkan "+item.title} disabled={busy||!!query||index===0} onClick={()=>void move(item,"up")}><ArrowUp size={14}/></button><button className="icon-button" title="Turun" aria-label={"Turunkan "+item.title} disabled={busy||!!query||index===context.items.length-1} onClick={()=>void move(item,"down")}><ArrowDown size={14}/></button></div></li>;
+        </div><div className="cu-actions"><button disabled={busy} onClick={()=>setEditor({item})} aria-label={"Edit "+item.title}><Pencil size={13}/>Edit</button><button className="icon-button" title="Naik" aria-label={"Naikkan "+item.title} disabled={busy||!!query||index===0} onClick={()=>void move(item,"up")}><ArrowUp size={14}/></button><button className="icon-button" title="Turun" aria-label={"Turunkan "+item.title} disabled={busy||!!query||index===context.items.length-1} onClick={()=>void move(item,"down")}><ArrowDown size={14}/></button><button className="icon-button danger" title={"Hapus "+item.title} aria-label={"Hapus "+item.title} disabled={busy} onClick={()=>setDeleting(item)}><Trash2 size={14}/></button></div></li>;
       })}</ul>}
     </section>:!loading&&!error&&!yearsLoading&&<EmptyState title="Pilih periode materi">Pilih tahun ajaran dan semester sebelum mengelola materi.</EmptyState>}
     {editor&&context&&<Editor kind={kind} context={context} item={editor.item} onClose={()=>setEditor(null)} onSaved={()=>{setEditor(null);setRevision(x=>x+1);toast("Materi berhasil disimpan.")}}/>}
+    {deleting&&<ConfirmDialog title={"Hapus "+labels[kind]+"?"} onClose={()=>setDeleting(null)} onConfirm={()=>void remove()} confirmLabel="Hapus" busy={busy}><strong>{deleting.title}</strong> akan dihapus permanen. Jika masih memiliki nilai atau relasi data, penghapusan akan ditolak.</ConfirmDialog>}
     {copying&&context&&<CopyDialog years={years} target={context.period} onClose={()=>setCopying(false)} onSaved={()=>{setCopying(false);setRevision(x=>x+1);toast("Struktur materi disalin tanpa nilai siswa.")}}/>}
   </main>;
 }

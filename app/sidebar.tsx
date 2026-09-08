@@ -4,17 +4,17 @@ import BrandLogo from "./brand-logo";
 import {usePathname,useRouter} from "next/navigation";
 import {useEffect,useRef,useState} from "react";
 import {api,errorMessage} from "@/lib/client-api";
-import {House,SquarePen,ChartColumn,School,LayoutGrid,Users,BookOpen,Download,UserRound,Menu,LogOut,X,PanelLeftClose,PanelLeftOpen} from "lucide-react";
+import {House,SquarePen,ChartColumn,School,LayoutGrid,Users,BookOpen,Download,UserRound,Menu,LogOut,X,PanelLeftClose,PanelLeftOpen,UserRoundSearch} from "lucide-react";
 import {useToast} from "./ui";
 
 const groups = [
-  ["Kerja harian", [["/dashboard", "Beranda", "home"], ["/assessment", "Penilaian", "edit"], ["/recap", "Rekap", "chart"]]],
+  ["Kerja harian", [["/dashboard", "Beranda", "home"], ["/assessment", "Tes per Materi", "edit"], ["/individual-assessment", "Tes per Individu", "individual"], ["/recap", "Rekap", "chart"]]],
   ["Kelola data", [["/master-data", "Sekolah & periode", "school"], ["/classes", "Kelas", "grid"], ["/students", "Siswa", "users"], ["/master-data/curriculum", "Materi", "book"]]],
   ["Laporan", [["/reports", "Ekspor & backup", "download"], ["/account", "Akun", "user"]]],
 ] as const;
 const mobile = groups[0][1];
 const active = (path:string, href:string) => path === href || (href !== "/master-data" && path.startsWith(`${href}/`));
-const icons={home:House,edit:SquarePen,chart:ChartColumn,school:School,grid:LayoutGrid,users:Users,book:BookOpen,download:Download,user:UserRound,more:Menu,logout:LogOut,close:X};
+const icons={home:House,edit:SquarePen,individual:UserRoundSearch,chart:ChartColumn,school:School,grid:LayoutGrid,users:Users,book:BookOpen,download:Download,user:UserRound,more:Menu,logout:LogOut,close:X};
 function NavIcon({name}:{name:keyof typeof icons}){const Icon=icons[name];return <Icon size={20} strokeWidth={1.7} aria-hidden="true"/>}
 
 export default function Sidebar() {
