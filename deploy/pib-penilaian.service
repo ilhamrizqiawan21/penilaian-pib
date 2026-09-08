@@ -5,12 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ilhamzp/Projects/penilaian-pib
+WorkingDirectory=%h/Projects/penilaian-pib
 Environment=NODE_ENV=production
 Environment=PIB_HOST=0.0.0.0
 Environment=PIB_PORT=3000
 Environment=PIB_NO_BROWSER=1
-ExecStart=/home/ilhamzp/Projects/penilaian-pib/mulai-pib.sh
+ExecStart=%h/Projects/penilaian-pib/mulai-pib.sh
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=180

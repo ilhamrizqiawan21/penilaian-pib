@@ -28,6 +28,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .toolbar-footer .actions{max-width:100%}
   .toolbar-footer select{max-width:calc(100vw - 130px)}
 }
+.auth-page{display:grid;place-items:center;min-height:calc(100vh - 120px);padding-top:32px!important;padding-bottom:32px!important}.auth-card{width:min(100%,430px);padding:34px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:0 18px 50px rgba(36,70,59,.08)}.auth-brand{display:flex;align-items:center;gap:12px}.auth-brand .brand-logo{width:46px;height:46px;padding:5px;border-radius:12px;background:var(--brand-soft)}.auth-brand .eyebrow{margin:0 0 2px;color:var(--brand);font-size:11px}.auth-brand span{font-size:12px;color:var(--muted)}.auth-heading{margin:34px 0 24px}.auth-heading h1{margin:0;font-size:26px;letter-spacing:-.035em;color:var(--ink)}.auth-heading p{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.6}.auth-card .section-stack{gap:18px}.auth-submit{width:100%;min-height:46px;margin-top:2px}.auth-card .hint{text-align:center;margin-top:2px}
 
 /* Motion feedback for navigation, async work, changing data, and status. */
 .route-progress{position:fixed;inset:0 0 auto;z-index:300;height:3px;pointer-events:none;opacity:0;overflow:hidden;transition:opacity .16s ease}
