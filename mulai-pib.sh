@@ -12,6 +12,12 @@ TSX_BIN="$ROOT_DIR/node_modules/.bin/tsx"
 
 cd "$ROOT_DIR"
 
+# Gunakan runtime lokal bila Node.js dipasang bersama proyek.
+LOCAL_NODE="$ROOT_DIR/.runtime/node-$(cat "$ROOT_DIR/.nvmrc" | tr -d '[:space:]' | sed 's/^/v/')-linux-x64/bin"
+if [[ -x "$LOCAL_NODE/node" ]]; then
+  export PATH="$LOCAL_NODE:$PATH"
+fi
+
 fail() {
   echo "[PIB] Error: $*" >&2
   exit 1

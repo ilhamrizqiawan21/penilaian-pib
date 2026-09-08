@@ -4,6 +4,16 @@ Aplikasi lokal untuk Penilaian Praktik Ibadah. Stack: Next.js, TypeScript, SQLit
 
 ## Menjalankan paling mudah
 
+Untuk pemasangan lengkap di Ubuntu/Linux x86_64 beserta autostart saat boot:
+
+```bash
+./deploy/install-local.sh
+```
+
+Installer memasang Node.js lokal sesuai `.nvmrc`, dependency terkunci, menjalankan
+pemeriksaan dan build production, lalu mengaktifkan layanan systemd pengguna.
+Database yang sudah ada tetap digunakan.
+
 Gunakan Node.js 24.x dan npm 11.x (setup lokal diverifikasi dengan Node.js 24.18.0 dan npm 11.16.0), lalu jalankan satu perintah dari folder project:
 
 ```bash
@@ -25,6 +35,27 @@ PIB_NO_BROWSER=1 ./mulai-pib.sh
 ```
 
 ## Penggunaan otomatis dan smartphone
+
+Runtime Node.js lokal dapat disimpan di `.runtime/node-v24.18.0-linux-x64`.
+Launcher otomatis menggunakan runtime tersebut. Untuk menjalankan perintah npm di terminal:
+
+```bash
+export PATH="$PWD/.runtime/node-v24.18.0-linux-x64/bin:$PATH"
+```
+
+Untuk memasang layanan pengguna pada folder `~/Projects/penilaian-pib`:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp deploy/pib-penilaian.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now pib-penilaian.service
+loginctl enable-linger "$USER"
+```
+
+Linger memungkinkan layanan berjalan saat boot tanpa menunggu login.
+Alamat jaringan di bawah berasal dari konfigurasi sebelumnya; gunakan IP komputer
+saat ini jika nama lokal atau Tailscale belum dikonfigurasi pada komputer ini.
 
 Pada komputer yang sudah disiapkan, `pib-penilaian.service` menjalankan aplikasi otomatis saat komputer boot. Tidak perlu menjalankan `./mulai-pib.sh` setiap kali akan memakai aplikasi.
 
