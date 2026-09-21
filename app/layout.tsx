@@ -3,6 +3,7 @@ import "./globals.css";
 import "./sidebar-fixes.css";
 import "./navigation.css";
 import "./branding.css";
+import "./workspace.css";
 import OfflineIndicator from "./offline-indicator";
 import AppLayout from "./app-layout";
 import {ToastProvider} from "./ui";

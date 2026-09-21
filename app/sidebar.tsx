@@ -1,16 +1,14 @@
 "use client";
 import Link from "next/link";
 import BrandLogo from "./brand-logo";
-import {usePathname,useRouter} from "next/navigation";
+import {usePathname} from "next/navigation";
 import {useEffect,useRef,useState} from "react";
-import {api,errorMessage} from "@/lib/client-api";
 import {House,SquarePen,ChartColumn,School,LayoutGrid,Users,BookOpen,Download,UserRound,Menu,LogOut,X,PanelLeftClose,PanelLeftOpen,UserRoundSearch} from "lucide-react";
-import {useToast} from "./ui";
 
 const groups = [
   ["Kerja harian", [["/dashboard", "Beranda", "home"], ["/assessment", "Tes per Materi", "edit"], ["/individual-assessment", "Tes per Individu", "individual"], ["/recap", "Rekap", "chart"]]],
   ["Kelola data", [["/master-data", "Sekolah & periode", "school"], ["/classes", "Kelas", "grid"], ["/students", "Siswa", "users"], ["/master-data/curriculum", "Materi", "book"]]],
-  ["Laporan", [["/reports", "Ekspor & backup", "download"], ["/account", "Akun", "user"]]],
+  ["Laporan", [["/reports", "Ekspor & backup", "download"]]],
 ] as const;
 const mobile = groups[0][1];
 const active = (path:string, href:string) => path === href || (href !== "/master-data" && path.startsWith(`${href}/`));
@@ -18,9 +16,7 @@ const icons={home:House,edit:SquarePen,individual:UserRoundSearch,chart:ChartCol
 function NavIcon({name}:{name:keyof typeof icons}){const Icon=icons[name];return <Icon size={20} strokeWidth={1.7} aria-hidden="true"/>}
 
 export default function Sidebar() {
-  const path = usePathname(), router = useRouter();
-  const toast=useToast();
-  const [busy,setBusy] = useState(false);
+  const path = usePathname();
   const [collapsed,setCollapsed] = useState(false), [ready,setReady] = useState(false);
   const [moreOpen,setMoreOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -54,13 +50,6 @@ export default function Sidebar() {
       moreButton.current?.focus();
     };
   }, [moreOpen]);
-  async function logout() {
-    setBusy(true);
-    try {
-      await api("/api/auth/logout", {method:"POST"});
-      setMoreOpen(false); router.replace("/login"); router.refresh();
-    } catch (e) { toast(`Gagal keluar: ${errorMessage(e)}`); setBusy(false); }
-  }
   const moreActive = !mobile.some(([href]) => active(path, href));
   return <>
     <aside id="app-sidebar" className={`sidebar${collapsed ? " collapsed" : ""}`}>
@@ -73,7 +62,6 @@ export default function Sidebar() {
             <span className="nav-icon"><NavIcon name={icon}/></span><span className="nav-text">{name}</span><span className="nav-tooltip" role="tooltip">{name}</span>
           </Link>)}
         </div>)}
-        <button className="logout" onClick={logout} disabled={busy} aria-label="Keluar aplikasi"><span className="nav-icon"><NavIcon name="logout"/></span><span className="nav-text">{busy ? "Keluar…" : "Keluar aplikasi"}</span><span className="nav-tooltip" role="tooltip">Keluar aplikasi</span></button>
       </nav>
     </aside>
     <nav className="mobile-nav" aria-label="Navigasi utama">
@@ -88,7 +76,6 @@ export default function Sidebar() {
     }}>
       <header className="mobile-menu-header"><div className="mobile-menu-brand"><BrandLogo/><div><p className="eyebrow">PIB Penilaian</p><h2 id="mobile-menu-title">Semua menu</h2></div></div><button type="button" className="icon-button" aria-label="Tutup menu" onClick={() => setMoreOpen(false)}><NavIcon name="close"/></button></header>
       <nav aria-label="Semua menu aplikasi">{groups.map(([label,items]) => <section className="mobile-menu-group" key={label}><h3>{label}</h3><div>{items.map(([href,name,icon]) => <Link href={href} key={href} className={active(path,href) ? "active" : ""} aria-current={active(path,href) ? "page" : undefined} onClick={() => setMoreOpen(false)}><NavIcon name={icon}/><span>{name}</span>{active(path,href) && <span className="sr-only">Halaman saat ini</span>}</Link>)}</div></section>)}</nav>
-      <button className="mobile-menu-logout" type="button" onClick={logout} disabled={busy}><NavIcon name="logout"/>{busy ? "Keluar…" : "Keluar aplikasi"}</button>
     </dialog>
   </>;
 }

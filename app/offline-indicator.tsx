@@ -6,7 +6,7 @@ import {DRAFT_EVENT,migrateLegacyDrafts,readDrafts} from "@/lib/assessment-works
 import {syncPendingScores} from "@/lib/score-client";
 export default function OfflineIndicator(){
   const path=usePathname(),[online,setOnline]=useState(true),[count,setCount]=useState(0);
-  const publicPage=["/","/login","/setup"].includes(path);
+  const publicPage=["/setup"].includes(path);
   useEffect(()=>{
     if(publicPage)return;
     const update=()=>{setOnline(navigator.onLine);try{setCount(readDrafts().filter(x=>x.status==="pending").length)}catch{}};
