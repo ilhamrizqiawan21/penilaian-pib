@@ -1,0 +1,13 @@
+[      54ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/_next/static/chunks/app/layout-a0945e10e9367d97.js:0
+[      54ms] [ERROR] Refused to execute script from 'http://localhost:3000/_next/static/chunks/app/layout-a0945e10e9367d97.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled. @ http://localhost:3000/dashboard:0
+[      54ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/_next/static/chunks/5239-a2a286cf51666ece.js:0
+[      54ms] [ERROR] Refused to execute script from 'http://localhost:3000/_next/static/chunks/5239-a2a286cf51666ece.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled. @ http://localhost:3000/dashboard:0
+[      81ms] ChunkLoadError: Loading chunk 7177 failed.
+(error: http://localhost:3000/_next/static/chunks/app/layout-a0945e10e9367d97.js)
+    at r.f.j (http://localhost:3000/_next/static/chunks/webpack-3f71bea1b5972951.js:1:2856)
+    at http://localhost:3000/_next/static/chunks/webpack-3f71bea1b5972951.js:1:1211
+    at Array.reduce (<anonymous>)
+    at r.e (http://localhost:3000/_next/static/chunks/webpack-3f71bea1b5972951.js:1:1190)
+    at c (http://localhost:3000/_next/static/chunks/1255-7316b50163a428e6.js:1:136758)
+    at http://localhost:3000/_next/static/chunks/1255-7316b50163a428e6.js:1:151678
+    at t (http://localhost:3000/_next/static/chunks/1255-7316b50163a428e6.js:1:153136)

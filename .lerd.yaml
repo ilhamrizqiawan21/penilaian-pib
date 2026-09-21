@@ -1,0 +1,5 @@
+domains:
+  - penilaian-pib
+secured: true
+container:
+  port: 3000

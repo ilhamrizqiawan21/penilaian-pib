@@ -20,13 +20,15 @@ Gunakan Node.js 24.x dan npm 11.x (setup lokal diverifikasi dengan Node.js 24.18
 ./mulai-pib.sh
 ```
 
-Launcher akan otomatis memasang dependency jika diperlukan, membuat konfigurasi dan secret lokal, menyiapkan database pertama kali, menjalankan build production bila belum tersedia atau sudah kedaluwarsa, menyalakan server, dan membuka browser. Untuk menghentikan server, tekan `Ctrl+C` pada terminal launcher.
+Launcher akan otomatis memasang dependency jika diperlukan, membuat konfigurasi lokal, menyiapkan database pertama kali, menjalankan build production bila belum tersedia atau sudah kedaluwarsa, menyalakan server, dan membuka browser. Aplikasi ini tidak memakai login; aksesnya sengaja dibatasi pada laptop lokal. Untuk menghentikan server, tekan `Ctrl+C` pada terminal launcher.
 
-Port default adalah `3000`. Jika port tersebut sedang dipakai, gunakan port lain:
+Port aplikasi ditetapkan satu jalur pada `3000`: Lerd, launcher, systemd, dan Next.js memakai port ini. Launcher sengaja tidak menerima override port agar tidak ada dua konfigurasi yang berbeda. Buka aplikasi melalui:
 
-```bash
-PIB_PORT=3001 ./mulai-pib.sh
+```text
+http://localhost:3000
 ```
+
+Jangan mengganti port kecuali konfigurasi Lerd, launcher, dan service systemd diubah bersama-sama.
 
 Untuk menjalankan tanpa membuka browser, misalnya pada komputer server:
 
@@ -97,11 +99,11 @@ npm run db:setup
 npm run dev
 ```
 
-Jika database `pib.sqlite` sudah tersedia, lewati `npm run db:setup` dan gunakan akun yang sudah ada. Jangan hapus database untuk memasang ulang dependency.
+Jika database `pib.sqlite` sudah tersedia, lewati `npm run db:setup`. Jangan hapus database untuk memasang ulang dependency.
 
 Versi dependency dikunci sesuai instalasi lokal; gunakan `npm ci` untuk instalasi ulang yang konsisten. Jika berpindah versi Node.js, jalankan kembali `npm ci` agar modul native SQLite sesuai dengan runtime.
 
-Login demo setelah database awal dibuat: `guru@pib.local` / `pib12345`.
+Pada pemakaian normal tidak ada halaman login. Data tetap memakai operator lokal internal untuk mencatat histori perubahan.
 
 Nilai dihitung sebagai `90 - jumlah kesalahan`; nilai kosong berbeda dari nol.
 
@@ -110,4 +112,4 @@ Nilai dihitung sebagai `90 - jumlah kesalahan`; nilai kosong berbeda dari nol.
 Jalankan npm test, npx tsc --noEmit, npm run build, dan npm run perf:check.
 Versi awal: 0.1.0. Unduh backup JSON sebelum melakukan update.
 
-Panduan login tersedia di docs/panduan-login.md.
+Panduan akses lokal dan auto-start tersedia di bagian penggunaan otomatis di atas.

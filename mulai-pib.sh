@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-PIB_PORT="${PIB_PORT:-3000}"
+PIB_PORT=3000
 PIB_HOST="${PIB_HOST:-127.0.0.1}"
 PIB_NO_BROWSER="${PIB_NO_BROWSER:-0}"
 ENV_FILE="$ROOT_DIR/.env.local"

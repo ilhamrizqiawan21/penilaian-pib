@@ -1,0 +1,138 @@
+- generic [active] [ref=f4e1]:
+  - progressbar [aria-hidden]
+  - link "Langsung ke konten" [ref=f4e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - navigation "Navigasi utama" [ref=f4e3]:
+    - link "Beranda" [ref=f4e4] [cursor=pointer]:
+      - /url: /dashboard
+    - link "Tes per Materi" [ref=f4e9] [cursor=pointer]:
+      - /url: /assessment
+    - link "Tes per Individu" [ref=f4e14] [cursor=pointer]:
+      - /url: /individual-assessment
+    - link "Rekap" [ref=f4e21] [cursor=pointer]:
+      - /url: /recap
+    - button "Lainnya" [ref=f4e25] [cursor=pointer]
+  - generic [ref=f4e28]:
+    - banner [ref=f4e29]:
+      - generic [ref=f4e30]:
+        - img "Logo PIB" [ref=f4e31]
+        - generic [ref=f4e32]: MTs. Al-Ihsan Batujajar
+    - main [ref=f4e34]:
+      - generic [ref=f4e35]:
+        - generic [ref=f4e36]:
+          - paragraph [ref=f4e37]: Ringkasan kerja
+          - heading "Selamat datang, Guru" [level=1] [ref=f4e38]
+          - paragraph [ref=f4e39]: 2026/2027 · Ganjil. Berikut pekerjaan yang dapat Anda lanjutkan hari ini.
+        - generic [ref=f4e41]:
+          - generic [ref=f4e42]: Periode beranda
+          - combobox "Periode beranda" [ref=f4e43]:
+            - option "Semua periode"
+            - option "2026/2027 · Ganjil" [selected]
+      - generic [ref=f4e44]:
+        - generic [ref=f4e45]:
+          - paragraph [ref=f4e46]: Langkah berikutnya
+          - heading "Mulai sesi penilaian" [level=2] [ref=f4e47]
+          - paragraph [ref=f4e48]: Pilih kelas dan materi. Input yang belum dikirim akan tersimpan sebagai draft di perangkat ini.
+        - link "Mulai penilaian" [ref=f4e49] [cursor=pointer]:
+          - /url: /assessment?classId=
+      - generic [ref=f4e52]:
+        - generic [ref=f4e53]:
+          - generic [ref=f4e54]: Siswa aktif
+          - strong [ref=f4e60]: "126"
+          - link "Kelola siswa" [ref=f4e61] [cursor=pointer]:
+            - /url: /students
+        - generic [ref=f4e65]:
+          - generic [ref=f4e66]: Kelas aktif
+          - strong [ref=f4e70]: "4"
+          - link "Lihat kelas" [ref=f4e71] [cursor=pointer]:
+            - /url: /classes
+        - generic [ref=f4e75]:
+          - generic [ref=f4e76]: Progres penilaian
+          - strong [ref=f4e79]: 15%
+          - generic [ref=f4e80]: 404 / 2646 nilai tersimpan
+      - generic [ref=f4e81]:
+        - generic [ref=f4e82]:
+          - generic [ref=f4e83]:
+            - generic [ref=f4e84]:
+              - paragraph [ref=f4e85]: Prioritas kelas
+              - heading "Penilaian yang belum selesai" [level=2] [ref=f4e86]
+            - link "Lihat rekap" [ref=f4e87] [cursor=pointer]:
+              - /url: /recap?academicYearId=3
+          - paragraph [ref=f4e91]: Menampilkan 4 dari 4 kelas aktif. Kelas dengan progres terendah didahulukan.
+          - generic [ref=f4e92]:
+            - generic [ref=f4e93]:
+              - generic [ref=f4e94]:
+                - link [ref=f4e95] [cursor=pointer]:
+                  - /url: /assessment?classId=4
+                  - strong [ref=f4e96]: VIII-C
+                - generic [ref=f4e100]: 0%
+              - progressbar "Progres VIII-C" [ref=f4e101]
+              - paragraph [ref=f4e102]: 32 siswa · 672 nilai belum terisi
+            - generic [ref=f4e103]:
+              - generic [ref=f4e104]:
+                - link [ref=f4e105] [cursor=pointer]:
+                  - /url: /assessment?classId=5
+                  - strong [ref=f4e106]: VIII-D
+                - generic [ref=f4e110]: 0%
+              - progressbar "Progres VIII-D" [ref=f4e111]
+              - paragraph [ref=f4e112]: 30 siswa · 630 nilai belum terisi
+            - generic [ref=f4e113]:
+              - generic [ref=f4e114]:
+                - link [ref=f4e115] [cursor=pointer]:
+                  - /url: /assessment?classId=3
+                  - strong [ref=f4e116]: VIII-B
+                - generic [ref=f4e120]: 21%
+              - progressbar "Progres VIII-B" [ref=f4e121]
+              - paragraph [ref=f4e123]: 32 siswa · 533 nilai belum terisi
+            - generic [ref=f4e124]:
+              - generic [ref=f4e125]:
+                - link [ref=f4e126] [cursor=pointer]:
+                  - /url: /assessment?classId=2
+                  - strong [ref=f4e127]: VIII-A
+                - generic [ref=f4e131]: 39%
+              - progressbar "Progres VIII-A" [ref=f4e132]
+              - paragraph [ref=f4e134]: 32 siswa · 407 nilai belum terisi
+        - generic [ref=f4e135]:
+          - paragraph [ref=f4e136]: Jejak kerja
+          - heading "Aktivitas terbaru" [level=2] [ref=f4e137]
+          - paragraph [ref=f4e138]: Aktivitas aplikasi dari seluruh periode.
+          - list [ref=f4e139]:
+            - listitem [ref=f4e140]:
+              - generic [ref=f4e142]:
+                - strong [ref=f4e143]: Nilai disinkronkan
+                - time [ref=f4e144]: 17 Sep, 08.15
+            - listitem [ref=f4e145]:
+              - generic [ref=f4e147]:
+                - strong [ref=f4e148]: Nilai disinkronkan
+                - time [ref=f4e149]: 17 Sep, 08.15
+            - listitem [ref=f4e150]:
+              - generic [ref=f4e152]:
+                - strong [ref=f4e153]: Nilai disinkronkan
+                - time [ref=f4e154]: 17 Sep, 08.15
+            - listitem [ref=f4e155]:
+              - generic [ref=f4e157]:
+                - strong [ref=f4e158]: Nilai disinkronkan
+                - time [ref=f4e159]: 17 Sep, 08.15
+            - listitem [ref=f4e160]:
+              - generic [ref=f4e162]:
+                - strong [ref=f4e163]: Nilai disinkronkan
+                - time [ref=f4e164]: 17 Sep, 08.06
+      - generic [ref=f4e165]:
+        - heading "Kelola ruang kerja" [level=2] [ref=f4e166]
+        - generic [ref=f4e167]:
+          - link "Tambah siswa Daftarkan atau impor siswa" [ref=f4e168] [cursor=pointer]:
+            - /url: /students?add=1
+            - generic [ref=f4e174]:
+              - text: Tambah siswa
+              - generic [ref=f4e175]: Daftarkan atau impor siswa
+          - link "Susun materi Bab, subbab, dan bobot nilai" [ref=f4e176] [cursor=pointer]:
+            - /url: /master-data/curriculum
+            - generic [ref=f4e179]:
+              - text: Susun materi
+              - generic [ref=f4e180]: Bab, subbab, dan bobot nilai
+          - link "Laporan & cadangan Unduh hasil dan salinan data" [ref=f4e181] [cursor=pointer]:
+            - /url: /reports
+            - generic [ref=f4e185]:
+              - text: Laporan & cadangan
+              - generic [ref=f4e186]: Unduh hasil dan salinan data
+  - alert [ref=f4e187]

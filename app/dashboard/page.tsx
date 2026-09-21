@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {BookOpen,GraduationCap,HardDriveDownload,Users,ChartNoAxesCombined,ArrowUpRight} from "lucide-react";
-import {currentUser} from "@/lib/auth";
 import {db} from "@/lib/db";
 import {dashboardProgress,getDashboardClasses} from "@/lib/dashboard";
 import {AcademicYear} from "@/lib/frontend-types";
@@ -9,9 +8,9 @@ import {DashboardPeriod,ResumeAssessment} from "./workspace-actions";
 export const dynamic="force-dynamic";
 type Activity={id:number;summary:string;created_at:string};
 export default async function Dashboard({searchParams}:{searchParams:Promise<{academicYearId?:string}>}){
-  const user=await currentUser(),params=await searchParams;
+  const params=await searchParams;
   const teacherSetting=db.prepare("SELECT value FROM settings WHERE key='teacherName'").get() as {value:string}|undefined;
-  const teacherName=teacherSetting?.value.trim()||user?.name?.trim()||"Guru";
+  const teacherName=teacherSetting?.value.trim()||"Guru";
   const years=db.prepare("SELECT * FROM academic_years ORDER BY id DESC").all() as AcademicYear[];
   const year=params.academicYearId==="all"?undefined:years.find(x=>String(x.id)===params.academicYearId)??years.find(x=>x.is_active);
   const classRows=getDashboardClasses(db,year?.id);
