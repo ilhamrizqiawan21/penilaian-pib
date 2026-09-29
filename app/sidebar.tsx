@@ -6,7 +6,7 @@ import {useEffect,useRef,useState} from "react";
 import {House,SquarePen,ChartColumn,School,LayoutGrid,Users,BookOpen,Download,UserRound,Menu,LogOut,X,PanelLeftClose,PanelLeftOpen,UserRoundSearch} from "lucide-react";
 
 const groups = [
-  ["Kerja harian", [["/dashboard", "Beranda", "home"], ["/assessment", "Tes per Materi", "edit"], ["/individual-assessment", "Tes per Individu", "individual"], ["/recap", "Rekap", "chart"]]],
+  ["Kerja harian", [["/dashboard", "Beranda", "home"], ["/assessment", "Tes per Materi", "edit"], ["/individual-assessment", "Setoran", "individual"], ["/recap", "Rekap", "chart"]]],
   ["Kelola data", [["/master-data", "Sekolah & periode", "school"], ["/classes", "Kelas", "grid"], ["/students", "Siswa", "users"], ["/master-data/curriculum", "Materi", "book"]]],
   ["Laporan", [["/reports", "Ekspor & backup", "download"]]],
 ] as const;

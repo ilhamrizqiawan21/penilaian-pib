@@ -1,60 +1,43 @@
-# Individual assessment draft safety
+# Setoran (pengganti Tes per Individu)
 
-User journeys were derived from the feature/input-flow evaluation in this session.
-Scope: the individual assessment UI and responsive controls. No database schema,
-score formula, API handler, or existing material-mode behavior was changed.
+Halaman `/individual-assessment` kini berjudul **Setoran**. Alurnya dirancang untuk
+satu pertemuan ketika beberapa siswa maju bergantian dengan materi berbeda sesuai
+progres masing-masing.
 
-## Regression evidence
+## Alur
 
-The executable browser regression is `scripts/individual-assessment-check.mjs`.
-It intercepts every `/api/**` request with fictional classes, students, sessions,
-and scores; unknown endpoints return 404. Service workers are blocked, each case
-uses a fresh browser context, and no application data is written.
+1. Pilih kelas sekali (diingat di perangkat).
+2. Pilih siswa dengan satu klik di daftar kiri, atau tekan `/`, ketik nama, Enter.
+   Setiap siswa menampilkan posisi materi berikutnya (`11/21`). Siswa yang dinilai
+   hari ini tampil paling atas.
+3. Seluruh materi kelas tampil dalam satu daftar per subbab; kursor langsung berada
+   di materi berikutnya. Materi sebelum posisi terjauh yang belum dinilai ditandai
+   **Terlewat**.
+4. Ketik jumlah kesalahan lalu Enter: nilai langsung dikirim dan kursor pindah ke
+   materi berikutnya. Tombol **90** menyimpan 0 kesalahan seketika.
 
-Run against the actual local Lerd site:
+Draft tetap disimpan di perangkat sebelum dikirim, sehingga input tidak hilang saat
+jaringan putus (status *Menunggu koneksi*) atau terjadi konflik versi.
 
-```sh
-PLAYWRIGHT_MODULE=/absolute/path/to/playwright node scripts/individual-assessment-check.mjs
-```
+## Implementasi
 
-Optional environment variables: `PIB_TEST_URL`, `CHROME_BIN`. The default target
-is `https://penilaian-pib.test`; the default Chrome binary is
-`/opt/google/chrome/chrome`. Playwright was reused from an existing installation,
-not added as a project dependency.
+- `GET /api/class-progress?classId=` (`lib/class-progress.ts`) mengembalikan materi
+  periode kelas sesuai urutan kurikulum, siswa aktif, dan seluruh baris nilai dalam
+  satu permintaan. Baris nilai yang dikosongkan ikut dikirim karena `updated_at`-nya
+  dipakai untuk deteksi konflik sinkronisasi.
+- `studentPosition` menentukan materi berikutnya dan materi terlewat.
+- Penyimpanan tetap memakai `/api/sync` melalui `submitScore`.
+- API `individual-sessions` lama dihapus; tabelnya dibiarkan agar data lama aman.
+- Tes per Materi memakai endpoint yang sama untuk satu pemilih materi berkelompok
+  (menggantikan dropdown Bab → Subbab → Materi). Tautan lama dengan `chapterId`/`subId`
+  tetap berfungsi karena materi divalidasi dari `assessmentId`.
 
-Before the fix, runtime assertions reproduced loss of another material's input
-after single save, loss after student navigation, loss of invalid input on bulk
-save, and editable controls during saving. Two additional tests initially failed
-because the new safe actions were not implemented yet. The completion test was
-already green with the mock fixture; it is regression coverage, not proof of a
-previous server-side failure.
+## Verifikasi 2026-09-29
 
-After the fix, all 11 scenarios pass:
-
-1. Saving one material preserves another material's draft.
-2. Drafts survive student changes and page reload.
-3. Bulk saving preserves invalid input, marks it invalid, and sends only changed valid drafts.
-4. Filling unassessed materials preserves existing scores and existing drafts.
-5. Saving disables editing and context changes.
-6. Failed bulk save preserves drafts and prevents automatic student navigation.
-7. Correcting a completed session does not send completion twice.
-8. Conflict survives reload and requires explicit restoration before editing.
-9. Save-and-next writes to the original student before switching.
-10. Unavailable browser storage preserves in-memory input and warns before navigation.
-11. At 320px, controls fit the viewport and the input remains usable.
-
-The first responsive run detected overflow; container-based control layout fixed
-it. The final screenshot uses fictional data and waits for viewport transitions.
-
-## Other checks and limits
-
-- `npm run typecheck`: passed.
-- `npm test`: 65 tests in 16 files passed (existing database tests use memory databases).
-- `npm run build`: passed, including type checking.
-- `npm run perf:check`: passed; browser assets measured 2.25 MB before the final CSS-only adjustment.
-- `git diff --check`: passed.
-- Browser tests exercise the production UI with simulated APIs, not real database writes.
-- Numeric coverage was not collected; no 80% coverage claim is made.
-- No checkpoint commits were made: application files already contained overlapping
-  local changes before this task. The working-tree changes and executable test
-  retain the implementation and RED/GREEN evidence without committing prior work.
+- `npm test`: 71 tes lulus, termasuk `lib/class-progress.test.ts`.
+- `npx tsc --noEmit` dan `next build` lulus.
+- Uji browser (Chrome + playwright-core, salinan database, port terpisah): 22
+  pemeriksaan lulus, meliputi pintasan `/`, Enter simpan & lanjut, tombol 90, urutan
+  "Dinilai hari ini", ganti siswa satu klik, input tidak valid tidak terkirim,
+  pemulihan kelas/siswa setelah reload, nilai tersimpan di database, tanpa overflow
+  horizontal di 375px, pemilih materi, dan tautan dari Rekap.

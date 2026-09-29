@@ -68,27 +68,56 @@ button:hover,.button:hover{transform:none}button:disabled:hover{box-shadow:none}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
-/* Individual assessment controls use the available workspace width. */
-.individual-page{container:individual / inline-size}
-.individual-page .progress-material{min-width:0}
-.individual-page .progress-material>div{min-width:0}
-.individual-page .progress-material h3,.individual-page .row-error{overflow-wrap:anywhere}
-.individual-page .progress-material .badge{white-space:normal}
-.individual-page .individual-editor .mistake-stepper input{min-width:0;width:0;flex:1}
-@container individual (max-width:900px){
-  .individual-page .progress-material{grid-template-columns:minmax(0,1fr) auto;gap:10px}
-  .individual-page .progress-material>div:first-child{grid-column:1;grid-row:1}
-  .individual-page .progress-material>.badge{grid-column:1;grid-row:2;justify-self:start}
-  .individual-page .progress-material>.score-number{grid-column:2;grid-row:1 / span 2}
-  .individual-page .individual-editor{grid-column:1 / -1;grid-row:3}
-  .individual-page .individual-editor .score-editor{flex-wrap:wrap}
-  .individual-page .individual-editor .mistake-stepper{flex:1;min-width:120px}
-  .individual-page .individual-editor button{min-height:44px;min-width:44px}
-  .individual-page .individual-editor .mistake-stepper input{min-height:44px;height:44px;font-size:16px}
+/* Tes per Materi: class + one grouped material picker. */
+.assessment-context .form-grid.assessment-picker{grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+@media(max-width:700px){.assessment-context .form-grid.assessment-picker{grid-template-columns:1fr}}
+/* Setoran: roster on the left, one student's full curriculum on the right. */
+.setoran-page{container:setoran / inline-size}
+.setoran-layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}
+.setoran-roster{position:sticky;top:84px;display:flex;flex-direction:column;gap:12px;padding:16px;max-height:calc(100dvh - 104px);animation:none}
+.setoran-roster .search-field{max-width:none;min-width:0}
+.setoran-roster-list{overflow:auto;margin:0 -8px;padding:0 8px;overscroll-behavior:contain}
+.setoran-roster-list ul{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:2px}
+.roster-heading{margin:8px 0 4px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.roster-item{width:100%;justify-content:space-between;gap:10px;min-height:44px;padding:7px 10px;border:0;border-radius:8px;background:transparent;box-shadow:none;text-align:left;font-weight:500}
+.roster-item:hover{transform:none;box-shadow:none;background:#f1f5f9}
+.roster-item[aria-pressed=true]{background:var(--brand-soft);color:var(--brand-strong)}
+.roster-name{display:grid;min-width:0}.roster-name strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.roster-name small{color:var(--muted);font-size:10px}
+.roster-meta{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.roster-position{font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;color:var(--muted);background:#f1f5f9;border-radius:6px;padding:2px 7px}
+.roster-item[aria-pressed=true] .roster-position{background:white;color:var(--brand-strong)}
+.roster-dot{width:8px;height:8px;border-radius:50%;background:var(--warning)}
+.setoran-editor{min-width:0}.setoran-editor>.empty{margin-top:0}
+.setoran-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.setoran-head h2{font-size:20px}.setoran-head .hint{font-size:12px;margin-top:4px}
+.setoran-gaps{margin:0 0 8px;font-size:12px;color:var(--danger)}
+.link-button{display:inline;min-height:0;padding:0;border:0;background:none;box-shadow:none;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:2px}.link-button:hover{background:none;box-shadow:none;transform:none}
+.setoran-groups{display:grid;gap:6px;margin-top:14px}
+.setoran-chapter{margin:12px 0 4px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--brand)}
+.setoran-group-toggle{width:100%;justify-content:flex-start;gap:10px;border-radius:10px;background:#f8fafc;box-shadow:none;text-align:left;font-size:13px}
+.setoran-group-toggle:hover{transform:none}
+.setoran-group-toggle svg{transition:transform .15s;transform:rotate(-90deg);flex-shrink:0;color:var(--muted)}.setoran-group-toggle[aria-expanded=true] svg{transform:none}
+.setoran-group-toggle>span:first-of-type{flex:1;min-width:0}
+.setoran-count{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted)}.setoran-count.complete{color:var(--success)}
+.setoran-rows{display:grid;gap:2px;padding:6px 0 4px}
+.setoran-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto 44px;align-items:center;gap:12px;padding:8px 10px;border-radius:10px}
+.setoran-row[data-next=true]{background:var(--warning-soft);box-shadow:inset 3px 0 var(--warning)}
+.setoran-row:focus-within{background:rgba(204,251,241,0.45);box-shadow:inset 3px 0 var(--brand)}
+.setoran-no{font-size:12px;font-weight:700;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+.setoran-title{min-width:0}.setoran-title strong{font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.setoran-status{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px}.setoran-status:empty{display:none}.setoran-status .row-error{margin:0}
+.setoran-perfect{min-width:34px;height:34px;min-height:34px;padding:4px;font-size:11px;font-weight:750;color:var(--brand-strong)}
+.setoran-row .score-number{text-align:right}
+@container setoran (max-width:860px){
+  .setoran-layout{grid-template-columns:1fr}
+  .setoran-roster{position:static;max-height:none}
+  .setoran-roster-list{max-height:40dvh}
 }
-@container individual (max-width:400px){
-  .individual-page .individual-editor .score-editor{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:8px}
-  .individual-page .individual-editor .mistake-stepper{grid-column:2 / -1;min-width:0}
-  .individual-page .individual-editor .mistake-stepper button{min-width:32px;flex-basis:32px}
-  .individual-page .individual-editor .score-editor>button.primary{grid-column:1 / 3}
+@container setoran (max-width:560px){
+  .setoran-head{flex-direction:column}
+  .setoran-row{grid-template-columns:24px minmax(0,1fr) 40px;gap:8px 10px}
+  .setoran-row .score-editor{grid-column:2 / -1;grid-row:2}
+  .setoran-row .score-number{grid-column:3;grid-row:1}
+  .setoran-row .mistake-stepper{flex:1;min-width:0}
+  .setoran-row .mistake-stepper input{flex:1;width:0;height:44px;min-height:44px;font-size:16px}
+  .setoran-row .mistake-stepper button,.setoran-row .score-editor>.icon-button{min-height:44px;height:44px;min-width:44px}
 }

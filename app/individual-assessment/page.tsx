@@ -1,197 +1,291 @@
 "use client";
+import Link from "next/link";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
-import {ArrowLeft,ArrowRight,Check,RotateCcw,Save,Sparkles} from "lucide-react";
-import {api,errorMessage,jsonRequest} from "@/lib/client-api";
-import {Assessment,Chapter,IndividualTestSession,IndividualTestSessionItem,SchoolClass,Student,Subchapter} from "@/lib/frontend-types";
-import {Alert,ConfirmDialog,EmptyState,ErrorState,LoadingState,PageHeader,ProgressBar,StatusBadge,useToast} from "@/app/ui";
+import {ArrowRight,ChevronDown,Minus,Plus,RotateCcw} from "lucide-react";
+import {api,errorMessage} from "@/lib/client-api";
+import {SchoolClass} from "@/lib/frontend-types";
+import {Alert,EmptyState,ErrorState,LoadingState,PageHeader,ProgressBar,SearchField,StatusBadge} from "@/app/ui";
 import {DRAFT_EVENT,ScoreDraft,createDraftId,deleteDraft,draftKey,parseMistakes,persistDraft,readDrafts,stepMistakes} from "@/lib/assessment-workspace";
 import {SCORE_SAVED_EVENT,submitScore} from "@/lib/score-client";
+import {ClassProgress,ProgressMaterial,ProgressScore,StudentPosition,isSameLocalDay,studentPosition} from "@/lib/class-progress";
 
-export default function IndividualAssessment(){
-  const [classes,setClasses]=useState<SchoolClass[]>([]),[students,setStudents]=useState<Student[]>([]);
-  const [chapters,setChapters]=useState<Chapter[]>([]),[subs,setSubs]=useState<Subchapter[]>([]);
-  const [session,setSession]=useState<IndividualTestSession|null>(null);
-  const [classId,setClassId]=useState(""),[studentId,setStudentId]=useState(""),[chapterId,setChapterId]=useState(""),[subId,setSubId]=useState("");
-  const [drafts,setDrafts]=useState<ScoreDraft[]>([]);
-  const [loading,setLoading]=useState(true),[optionsLoading,setOptionsLoading]=useState(false),[rowsLoading,setRowsLoading]=useState(false);
-  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[storageError,setStorageError]=useState("");
-  const [retry,setRetry]=useState(0),[discarding,setDiscarding]=useState<IndividualTestSessionItem|null>(null);
-  const volatile=useRef(new Map<string,ScoreDraft>()),lock=useRef(false),currentSession=useRef(session);
-  currentSession.current=session;
-  const toast=useToast();
+const LAST_SETORAN="pib-last-setoran";
+type Group={key:string;chapter:string;subchapter:string;items:{material:ProgressMaterial;index:number}[]};
+const draftLabels={dirty:"Belum terkirim",pending:"Menunggu koneksi",conflict:"Konflik",failed:"Gagal"} as const;
 
-  const getDrafts=useCallback(()=>{
-    const merged=new Map<string,ScoreDraft>();
-    try{for(const draft of readDrafts())merged.set(draft.key,draft)}catch{setStorageError("Penyimpanan perangkat tidak tersedia. Jangan tutup halaman sebelum nilai berhasil disimpan.")}
-    for(const draft of volatile.current.values())merged.set(draft.key,draft);
-    return [...merged.values()];
+export default function Setoran(){
+  const [classes,setClasses]=useState<SchoolClass[]>([]),[classId,setClassId]=useState("");
+  const [data,setData]=useState<ClassProgress|null>(null),[scores,setScores]=useState<Record<string,ProgressScore>>({});
+  const [studentId,setStudentId]=useState<number|null>(null),[query,setQuery]=useState("");
+  const [drafts,setDrafts]=useState<ScoreDraft[]>([]),[saving,setSaving]=useState<string[]>([]);
+  const [open,setOpen]=useState<Set<string>>(new Set()),[focusRequest,setFocusRequest]=useState<number|null>(null);
+  const [loading,setLoading]=useState(true),[dataLoading,setDataLoading]=useState(false);
+  const [error,setError]=useState(""),[message,setMessage]=useState(""),[storageError,setStorageError]=useState("");
+  const [retry,setRetry]=useState(0),[reload,setReload]=useState(0);
+  const volatile=useRef(new Map<string,ScoreDraft>()),locks=useRef(new Set<string>()),restoreStudent=useRef<number|null>(null),pendingOpen=useRef(false);
+  const rosterRef=useRef<HTMLDivElement>(null),editorRef=useRef<HTMLElement>(null);
+
+  const refreshDrafts=useCallback(()=>{
+    try{const stored=readDrafts();setDrafts([...stored.filter(x=>!volatile.current.has(x.key)),...volatile.current.values()])}
+    catch{setDrafts([...volatile.current.values()]);setStorageError("Penyimpanan perangkat tidak tersedia. Jangan tutup halaman sebelum nilai terkirim.")}
   },[]);
-  const refreshDrafts=useCallback(()=>setDrafts(getDrafts()),[getDrafts]);
+  const readDraft=(key:string)=>{
+    const memory=volatile.current.get(key);if(memory)return memory;
+    try{return readDrafts().find(x=>x.key===key)}catch{return undefined}
+  };
+
   useEffect(()=>{
     refreshDrafts();
     const saved=(event:Event)=>{
       const {draft,score,mistakes,updatedAt}=(event as CustomEvent<{draft:ScoreDraft;score:number|null;mistakes:number|null;updatedAt?:string}>).detail;
-      setSession(row=>row?.student_id===draft.studentId?{...row,items:row.items.map(item=>item.assessment_id===draft.assessmentId?{...item,score,mistakes,updated_at:updatedAt}:item)}:row);
-      refreshDrafts();
+      setScores(current=>({...current,[draft.key]:{student_id:draft.studentId,assessment_id:draft.assessmentId,score,mistakes,updated_at:updatedAt??current[draft.key]?.updated_at??"",assessed_at:score===null?null:new Date().toISOString()}}));
     };
-    const before=(event:BeforeUnloadEvent)=>{if(volatile.current.size||lock.current){event.preventDefault();event.returnValue=""}};
-    const navigate=(event:MouseEvent)=>{
-      if(!(event.target instanceof Element)||!event.target.closest("a[href]"))return;
-      if(lock.current||(volatile.current.size&&!window.confirm("Draft belum tersimpan di perangkat. Tetap tinggalkan halaman?"))){event.preventDefault();event.stopPropagation()}
+    const before=(event:BeforeUnloadEvent)=>{if(volatile.current.size||locks.current.size){event.preventDefault();event.returnValue=""}};
+    const slash=(event:KeyboardEvent)=>{
+      if(event.key!=="/"||event.ctrlKey||event.metaKey||event.altKey)return;
+      const target=event.target as HTMLElement|null;
+      if(target?.closest("input,textarea,select,[contenteditable=true]"))return;
+      const search=rosterRef.current?.querySelector<HTMLInputElement>("input[type=search]");
+      if(search){event.preventDefault();search.focus();search.select()}
     };
-    window.addEventListener(DRAFT_EVENT,refreshDrafts);window.addEventListener("storage",refreshDrafts);
-    window.addEventListener(SCORE_SAVED_EVENT,saved);window.addEventListener("beforeunload",before);document.addEventListener("click",navigate,true);
-    return()=>{window.removeEventListener(DRAFT_EVENT,refreshDrafts);window.removeEventListener("storage",refreshDrafts);window.removeEventListener(SCORE_SAVED_EVENT,saved);window.removeEventListener("beforeunload",before);document.removeEventListener("click",navigate,true)};
+    window.addEventListener(DRAFT_EVENT,refreshDrafts);window.addEventListener("storage",refreshDrafts);window.addEventListener(SCORE_SAVED_EVENT,saved);
+    window.addEventListener("beforeunload",before);document.addEventListener("keydown",slash);
+    return()=>{window.removeEventListener(DRAFT_EVENT,refreshDrafts);window.removeEventListener("storage",refreshDrafts);window.removeEventListener(SCORE_SAVED_EVENT,saved);window.removeEventListener("beforeunload",before);document.removeEventListener("keydown",slash)};
   },[refreshDrafts]);
 
   useEffect(()=>{
     const controller=new AbortController();setLoading(true);setError("");
-    Promise.all([api<SchoolClass[]>("/api/classes",{signal:controller.signal}),api<Chapter[]>("/api/chapters",{signal:controller.signal})])
-      .then(([c,ch])=>{if(!controller.signal.aborted){setClasses(c);setChapters(ch)}})
-      .catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e))}).finally(()=>{if(!controller.signal.aborted)setLoading(false)});
+    api<SchoolClass[]>("/api/classes",{signal:controller.signal}).then(rows=>{
+      if(controller.signal.aborted)return;
+      setClasses(rows);
+      let last:{classId?:string;studentId?:number}={};
+      try{last=JSON.parse(localStorage.getItem(LAST_SETORAN)??"{}")}catch{}
+      const params=new URLSearchParams(window.location.search);
+      const wanted=params.get("classId")??last.classId??"";
+      const selected=rows.find(x=>String(x.id)===wanted)??(rows.length===1?rows[0]:undefined);
+      if(selected){
+        restoreStudent.current=Number(params.get("studentId"))||(String(selected.id)===last.classId?last.studentId??null:null);
+        setClassId(current=>current||String(selected.id));
+      }
+    }).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e))}).finally(()=>{if(!controller.signal.aborted)setLoading(false)});
     return()=>controller.abort();
   },[retry]);
-  useEffect(()=>{
-    const controller=new AbortController();setStudents([]);
-    if(classId)void api<Student[]>("/api/students?classId="+classId,{signal:controller.signal}).then(rows=>{if(!controller.signal.aborted)setStudents(rows)}).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e))});
-    return()=>controller.abort();
-  },[classId,retry]);
-  const relevantChapters=useMemo(()=>chapters.filter(x=>!x.academic_year_id||String(x.academic_year_id)===String(classes.find(c=>String(c.id)===classId)?.academic_year_id)),[chapters,classes,classId]);
-  useEffect(()=>{
-    const controller=new AbortController();setSubs([]);setOptionsLoading(!!chapterId);
-    if(chapterId)void api<Subchapter[]>("/api/subchapters?chapterId="+chapterId,{signal:controller.signal}).then(rows=>{if(!controller.signal.aborted)setSubs(rows)}).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e))}).finally(()=>{if(!controller.signal.aborted)setOptionsLoading(false)});
-    return()=>controller.abort();
-  },[chapterId,retry]);
-  useEffect(()=>{
-    const controller=new AbortController();setSession(null);setRowsLoading(!!subId&&!!studentId);
-    if(subId&&studentId)void (async()=>{
-      try{
-        const materials=await api<Assessment[]>("/api/assessments?subchapterId="+subId,{signal:controller.signal});
-        if(controller.signal.aborted||!materials.length)return;
-        const row=await api<IndividualTestSession>("/api/individual-sessions",{...jsonRequest("POST",{studentId:Number(studentId),assessmentIds:materials.map(x=>x.id)}),signal:controller.signal});
-        if(!controller.signal.aborted){setSession(row);refreshDrafts()}
-      }catch(e){if(!controller.signal.aborted)setError(errorMessage(e))}
-      finally{if(!controller.signal.aborted)setRowsLoading(false)}
-    })();
-    return()=>controller.abort();
-  },[subId,studentId,retry,refreshDrafts]);
 
-  function changeContext(change:()=>void){
-    if(lock.current)return;
-    if(volatile.current.size&&!window.confirm("Draft belum tersimpan di perangkat. Tetap ganti pilihan?"))return;
-    setSession(null);setMessage("");setError("");change();
+  useEffect(()=>{
+    const controller=new AbortController();setData(null);setScores({});
+    if(!classId){setDataLoading(false);return}
+    setDataLoading(true);setError("");
+    api<ClassProgress>("/api/class-progress?classId="+classId,{signal:controller.signal}).then(result=>{
+      if(controller.signal.aborted)return;
+      pendingOpen.current=true;setData(result);setScores(Object.fromEntries(result.scores.map(x=>[draftKey(x.student_id,x.assessment_id),x])));
+      setStudentId(current=>{
+        const wanted=current??restoreStudent.current;restoreStudent.current=null;
+        return result.students.some(s=>s.id===wanted)?wanted:null;
+      });
+    }).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e))}).finally(()=>{if(!controller.signal.aborted)setDataLoading(false)});
+    return()=>controller.abort();
+  },[classId,reload]);
+
+  useEffect(()=>{if(classId)try{localStorage.setItem(LAST_SETORAN,JSON.stringify({classId,studentId}))}catch{}},[classId,studentId]);
+
+  const materialIds=useMemo(()=>data?.materials.map(m=>m.id)??[],[data]);
+  const groups=useMemo(()=>{
+    const rows:Group[]=[];
+    data?.materials.forEach((material,index)=>{
+      const last=rows[rows.length-1];
+      if(last?.key===String(material.subchapter_id))last.items.push({material,index});
+      else rows.push({key:String(material.subchapter_id),chapter:material.chapter,subchapter:material.subchapter,items:[{material,index}]});
+    });
+    return rows;
+  },[data]);
+  const positions=useMemo(()=>new Map<number,StudentPosition>((data?.students??[]).map(s=>[s.id,studentPosition(materialIds,id=>scores[draftKey(s.id,id)]?.score!=null)])),[data,materialIds,scores]);
+  const classDrafts=useMemo(()=>{
+    const ids=new Set(data?.students.map(s=>s.id)),materials=new Set(materialIds);
+    return drafts.filter(d=>ids.has(d.studentId)&&materials.has(d.assessmentId));
+  },[drafts,data,materialIds]);
+  const draftMap=useMemo(()=>Object.fromEntries(classDrafts.map(d=>[d.key,d])),[classDrafts]);
+  const roster=useMemo(()=>{
+    const latest=new Map<number,string>();
+    for(const row of Object.values(scores))if(row.score!=null&&isSameLocalDay(row.assessed_at)&&(latest.get(row.student_id)??"")<(row.assessed_at??""))latest.set(row.student_id,row.assessed_at??"");
+    const needle=query.trim().toLocaleLowerCase("id");
+    const visible=(data?.students??[]).filter(s=>(s.name+" "+(s.nis??"")).toLocaleLowerCase("id").includes(needle));
+    const today=visible.filter(s=>latest.has(s.id)).sort((a,b)=>(latest.get(b.id)??"").localeCompare(latest.get(a.id)??""));
+    return {today,others:visible.filter(s=>!latest.has(s.id))};
+  },[data,scores,query]);
+
+  const student=data?.students.find(s=>s.id===studentId)??null;
+  const position=student?positions.get(student.id):undefined;
+
+  useEffect(()=>{
+    if(focusRequest===null)return;
+    const input=editorRef.current?.querySelector<HTMLInputElement>(`input[data-material="${focusRequest}"]`);
+    if(input){input.focus();input.select();input.scrollIntoView({block:"nearest"})}
+    setFocusRequest(null);
+  },[focusRequest,open]);
+
+  // After a (re)load, expand the selected student's working area once positions are known.
+  useEffect(()=>{
+    if(!pendingOpen.current||!data)return;
+    pendingOpen.current=false;
+    if(studentId!==null)setOpen(openFor(studentId));
+  },[positions]);
+
+  function openFor(id:number){
+    const pos=positions.get(id),keys=new Set<string>();
+    const add=(index:number)=>{const m=data?.materials[index];if(m)keys.add(String(m.subchapter_id))};
+    if(pos){add(pos.nextIndex<0?0:pos.nextIndex);pos.gaps.forEach(add)}
+    for(const d of classDrafts)if(d.studentId===id){const m=data?.materials.find(x=>x.id===d.assessmentId);if(m)keys.add(String(m.subchapter_id))}
+    return keys;
   }
-  const currentDrafts=drafts.filter(d=>d.studentId===session?.student_id&&session.items.some(item=>item.assessment_id===d.assessmentId));
-  const draftMap=Object.fromEntries(currentDrafts.map(d=>[d.assessmentId,d]));
-  const rawFor=(item:IndividualTestSessionItem)=>draftMap[item.assessment_id]?.raw??String(item.mistakes??"");
-  const assessed=session?.items.filter(x=>x.score!==null).length??0;
-  const percent=session?.items.length?Math.round(assessed/session.items.length*100):0;
-  const index=students.findIndex(s=>String(s.id)===studentId),prevStudent=index>0?students[index-1]:null,nextStudent=index>=0?students[index+1]:null;
-  const activeStudent=students.find(s=>String(s.id)===studentId);
+  function focusMaterial(index:number){
+    const m=data?.materials[index];
+    if(!m){const search=rosterRef.current?.querySelector<HTMLInputElement>("input[type=search]");search?.focus();return}
+    setOpen(current=>current.has(String(m.subchapter_id))?current:new Set(current).add(String(m.subchapter_id)));
+    setFocusRequest(m.id);
+  }
+  function selectStudent(id:number){
+    setStudentId(id);setQuery("");setMessage("");setOpen(openFor(id));
+    const pos=positions.get(id),m=data?.materials[pos&&pos.nextIndex>=0?pos.nextIndex:0];
+    if(m)setFocusRequest(m.id);
+  }
+  function changeClass(value:string){
+    if(volatile.current.size&&!window.confirm("Sebagian perubahan belum tersimpan di perangkat. Tetap ganti kelas?"))return;
+    setClassId(value);setStudentId(null);setQuery("");setMessage("");
+  }
 
-  function edit(item:IndividualTestSessionItem,raw:string){
-    if(!session||lock.current)return;
-    const previous=getDrafts().find(d=>d.key===draftKey(session.student_id,item.assessment_id));
-    if(previous?.status==="conflict")return;
-    const draft:ScoreDraft={key:draftKey(session.student_id,item.assessment_id),studentId:session.student_id,assessmentId:item.assessment_id,raw,id:createDraftId(),deviceId:"browser",baseUpdatedAt:previous?previous.baseUpdatedAt:item.updated_at??null,status:"dirty"};
-    volatile.current.set(draft.key,draft);
-    try{persistDraft(draft);volatile.current.delete(draft.key);if(!volatile.current.size)setStorageError("")}
-    catch{setStorageError("Draft belum tersimpan di perangkat. Jangan tutup halaman; aktifkan penyimpanan browser lalu coba simpan lagi.")}
+  function edit(material:ProgressMaterial,raw:string){
+    if(!student)return;
+    const key=draftKey(student.id,material.id);
+    if(locks.current.has(key))return;
+    const previous=readDraft(key);
+    if(previous?.status==="conflict")return previous;
+    const draft:ScoreDraft={key,studentId:student.id,assessmentId:material.id,raw,id:createDraftId(),deviceId:"browser",baseUpdatedAt:previous?previous.baseUpdatedAt:scores[key]?.updated_at??null,status:"dirty"};
+    volatile.current.set(key,draft);
+    try{persistDraft(draft);volatile.current.delete(key);if(!volatile.current.size)setStorageError("")}
+    catch{setStorageError("Perubahan belum tersimpan di perangkat. Jangan tutup halaman; aktifkan penyimpanan browser.")}
     refreshDrafts();
+    return draft;
   }
-  function adjust(item:IndividualTestSessionItem,delta:number){const next=stepMistakes(rawFor(item),delta);if(next!==null)edit(item,next)}
-  function fillUnassessed(){
-    let count=0;
-    for(const item of session?.items??[])if(item.score===null&&!draftMap[item.assessment_id]){edit(item,"0");count++}
-    toast(count+" materi belum dinilai diisi 0 kesalahan. Simpan untuk mengirim nilai.");
-  }
-  async function saveItems(items:IndividualTestSessionItem[],advance=false){
-    if(!session||lock.current)return;
-    const target=session;lock.current=true;setBusy(true);setMessage("");
-    let saved=0;
-    const problems:string[]=[];
+  async function commit(material:ProgressMaterial,index:number,given?:ScoreDraft){
+    if(!student)return;
+    const key=draftKey(student.id,material.id),draft=given??readDraft(key);
+    if(!draft){focusMaterial(index+1);return}
+    const parsed=parseMistakes(draft.raw);
+    if(!parsed.valid){setMessage(`${material.title}: ${parsed.error}`);return}
+    if(draft.status==="conflict"){setMessage(`${material.title}: nilai di server sudah berubah. Klik tombol kembalikan untuk memuat nilai terbaru.`);return}
+    if(locks.current.has(key))return;
+    locks.current.add(key);setSaving([...locks.current]);setMessage("");
+    focusMaterial(index+1);
     try{
-      for(const item of items){
-        const draft=getDrafts().find(d=>d.key===draftKey(target.student_id,item.assessment_id));
-        if(!draft)continue;
-        const parsed=parseMistakes(draft.raw);
-        if(!parsed.valid||draft.status==="conflict"){problems.push(item.title);continue}
-        try{
-          const queued={...draft,status:"pending" as const,error:undefined};
-          persistDraft(queued);volatile.current.delete(draft.key);refreshDrafts();
-          if(await submitScore(queued))saved++;else problems.push(item.title);
-        }catch{problems.push(item.title);setStorageError("Sebagian draft belum bisa disimpan atau dikirim. Input tetap dipertahankan; coba lagi.")}
-      }
-      const row=await api<IndividualTestSession>(`/api/individual-sessions?id=${target.id}&studentId=${target.student_id}`);
-      // Server refresh updates saved values only. Drafts remain keyed by student + material.
-      if(currentSession.current?.id===target.id)setSession(row);
-      refreshDrafts();
-      const remaining=getDrafts().filter(d=>d.studentId===target.student_id&&row.items.some(item=>item.assessment_id===d.assessmentId));
-      if(!problems.length&&!remaining.length&&row.items.length&&row.items.every(item=>item.score!==null)&&row.status==="ACTIVE"){
-        const completed=await api<IndividualTestSession>("/api/individual-sessions",jsonRequest("PATCH",{id:target.id,status:"COMPLETED"}));
-        if(currentSession.current?.id===target.id)setSession(completed);
-      }
-      if(!volatile.current.size)setStorageError("");
-      setMessage(`${saved} perubahan tersimpan.`+(problems.length?` Belum tersimpan: ${problems.join(", ")}. Periksa status di tiap materi.`:""));
-      if(saved)toast(saved+" nilai materi berhasil disimpan.");
-      if(advance&&nextStudent&&!remaining.length&&!problems.length){setStudentId(String(nextStudent.id));setSession(null);setMessage("")}
-    }catch(e){setMessage("Input tetap dipertahankan. "+errorMessage(e))}
-    finally{lock.current=false;setBusy(false);refreshDrafts()}
+      const queued={...draft,status:"pending" as const,error:undefined};
+      persistDraft(queued);volatile.current.delete(key);refreshDrafts();
+      await submitScore(queued);
+    }catch{setStorageError("Nilai belum bisa disimpan di perangkat atau dikirim. Input tetap dipertahankan; coba lagi.")}
+    finally{locks.current.delete(key);setSaving([...locks.current]);refreshDrafts()}
   }
-  async function discard(){
-    if(!discarding||!session||lock.current)return;
-    lock.current=true;setBusy(true);
-    try{
-      const row=await api<IndividualTestSession>(`/api/individual-sessions?id=${session.id}&studentId=${session.student_id}`);
-      const key=draftKey(session.student_id,discarding.assessment_id);
-      deleteDraft(key);volatile.current.delete(key);setSession(row);refreshDrafts();setDiscarding(null);
-    }catch(e){setMessage(errorMessage(e))}finally{lock.current=false;setBusy(false)}
+  function discard(material:ProgressMaterial){
+    if(!student)return;
+    const key=draftKey(student.id,material.id),conflict=draftMap[key]?.status==="conflict";
+    try{deleteDraft(key)}catch{}
+    volatile.current.delete(key);refreshDrafts();
+    if(conflict)setReload(x=>x+1);
+    setFocusRequest(material.id);
+  }
+
+  function row(material:ProgressMaterial,index:number){
+    if(!student||!position)return null;
+    const key=draftKey(student.id,material.id),draft=draftMap[key],server=scores[key];
+    const raw=draft?.raw??(server?.mistakes==null?"":String(server.mistakes));
+    const parsed=parseMistakes(raw),busy=saving.includes(key),conflict=draft?.status==="conflict";
+    const isNext=index===position.nextIndex,isGap=position.gaps.includes(index);
+    const status=busy?<StatusBadge>Menyimpan…</StatusBadge>
+      :draft?<StatusBadge tone={draft.status==="dirty"||draft.status==="pending"?"warning":"danger"}>{draftLabels[draft.status]}</StatusBadge>
+      :server?.score!=null?<StatusBadge tone="success">{isSameLocalDay(server.assessed_at)?"Tersimpan hari ini":"Tersimpan"}</StatusBadge>
+      :isNext?<StatusBadge tone="warning">Berikutnya</StatusBadge>
+      :isGap?<StatusBadge tone="danger">Terlewat</StatusBadge>:null;
+    const errorText=!parsed.valid?parsed.error:draft?.error;
+    return <div className="setoran-row" key={material.id} data-next={isNext} data-dirty={!!draft}>
+      <span className="setoran-no">{index+1}</span>
+      <div className="setoran-title"><strong>{material.title}</strong><div className="setoran-status">{status}{draft&&raw.trim()===""&&<span className="row-error">Nilai akan dikosongkan.</span>}{errorText&&<span className="row-error" id={`setoran-error-${material.id}`}>{errorText}</span>}</div></div>
+      <div className="score-editor">
+        <button type="button" className="ghost icon-button setoran-perfect" title="Lancar: 0 kesalahan (nilai 90), langsung simpan" aria-label={`Nilai 90 untuk ${material.title}`} disabled={busy||conflict} onClick={()=>{const d=edit(material,"0");if(d)void commit(material,index,d)}}>90</button>
+        <div className="mistake-stepper">
+          <button type="button" className="icon-button" aria-label={`Kurangi kesalahan ${material.title}`} disabled={busy||conflict} onClick={()=>{const next=stepMistakes(raw,-1);if(next!==null)edit(material,next)}}><Minus size={14}/></button>
+          <input data-material={material.id} aria-label={`Jumlah kesalahan ${material.title}`} aria-invalid={!parsed.valid} aria-describedby={errorText?`setoran-error-${material.id}`:"setoran-help"} value={raw} type="text" inputMode="numeric" enterKeyHint="next" autoComplete="off" disabled={busy||conflict}
+            onFocus={e=>e.currentTarget.select()} onChange={e=>edit(material,e.target.value)}
+            onKeyDown={e=>{
+              if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();const next=stepMistakes(raw,e.key==="ArrowUp"?1:-1);if(next!==null)edit(material,next)}
+              else if(e.key==="Enter"){e.preventDefault();void commit(material,index)}
+            }}/>
+          <button type="button" className="icon-button" aria-label={`Tambah kesalahan ${material.title}`} disabled={busy||conflict} onClick={()=>{const next=stepMistakes(raw,1);if(next!==null)edit(material,next)}}><Plus size={14}/></button>
+        </div>
+        {draft&&<button type="button" className="icon-button" title={conflict?"Muat nilai terbaru dari server":"Batalkan perubahan"} aria-label={`Kembalikan nilai ${material.title}`} disabled={busy} onClick={()=>discard(material)}><RotateCcw size={15}/></button>}
+      </div>
+      <strong className="score-number" aria-label={`Nilai ${material.title}`}>{parsed.valid?parsed.score??"—":"—"}</strong>
+    </div>;
+  }
+
+  function rosterButton(id:number,name:string,nis:string|null){
+    const pos=positions.get(id),pending=classDrafts.some(d=>d.studentId===id);
+    const label=!pos?.total?"—":pos.nextIndex<0?"Selesai":`${pos.nextIndex+1}/${pos.total}`;
+    return <li key={id}><button type="button" className="roster-item" aria-pressed={id===studentId} onClick={()=>selectStudent(id)}>
+      <span className="roster-name"><strong>{name}</strong>{nis&&<small>{nis}</small>}</span>
+      <span className="roster-meta">{pending&&<span className="roster-dot" title="Ada nilai belum terkirim" aria-label="Ada nilai belum terkirim"/>}<span className="roster-position" title="Posisi materi berikutnya">{label}</span></span>
+    </button></li>;
   }
 
   if(loading)return <main className="app"><LoadingState/></main>;
-  return <main className="app individual-page">
-    <PageHeader eyebrow="Ruang kerja guru" title="Tes per Individu" description="Pilih siswa dan subbab, isi jumlah kesalahan, lalu simpan nilai.">
-      {studentId&&<div className="actions">
-        {prevStudent&&<button disabled={busy||rowsLoading} onClick={()=>changeContext(()=>setStudentId(String(prevStudent.id)))}><ArrowLeft size={15}/>Siswa sebelumnya</button>}
-        {nextStudent&&<button disabled={busy||rowsLoading} onClick={()=>changeContext(()=>setStudentId(String(nextStudent.id)))}>Siswa berikutnya<ArrowRight size={15}/></button>}
-      </div>}
-    </PageHeader>
-    <section className="card"><div className="form-grid">
-      <div className="field"><label htmlFor="individual-class">Kelas</label><select id="individual-class" value={classId} disabled={busy} onChange={e=>changeContext(()=>{setClassId(e.target.value);setStudentId("");setChapterId("");setSubId("")})}><option value="">Pilih kelas</option>{classes.map(c=><option value={c.id} key={c.id}>{c.name} · {c.academic_year_name} / {c.semester}</option>)}</select></div>
-      <div className="field"><label htmlFor="individual-student">Siswa</label><select id="individual-student" value={studentId} disabled={!classId||busy} onChange={e=>changeContext(()=>setStudentId(e.target.value))}><option value="">Pilih siswa</option>{students.map(s=><option value={s.id} key={s.id}>{s.name}{s.nis?` · ${s.nis}`:""}</option>)}</select></div>
-      <div className="field"><label htmlFor="individual-chapter">Bab</label><select id="individual-chapter" value={chapterId} disabled={!studentId||busy} onChange={e=>changeContext(()=>{setChapterId(e.target.value);setSubId("")})}><option value="">Pilih bab</option>{relevantChapters.map(c=><option value={c.id} key={c.id}>{c.title}</option>)}</select></div>
-      <div className="field"><label htmlFor="individual-subchapter">Subbab</label><select id="individual-subchapter" value={subId} disabled={!chapterId||busy||optionsLoading} onChange={e=>changeContext(()=>setSubId(e.target.value))}><option value="">{optionsLoading?"Memuat subbab…":"Pilih subbab"}</option>{subs.map(s=><option value={s.id} key={s.id}>{s.title}</option>)}</select></div>
-    </div></section>
-    {error&&<ErrorState message={error} onRetry={()=>setRetry(x=>x+1)}/>}
+  const firstMatch=roster.today[0]??roster.others[0];
+  return <main className="app setoran-page">
+    <PageHeader eyebrow="Ruang kerja guru" title="Setoran" description="Pilih siswa yang maju, ketik jumlah kesalahan, lalu tekan Enter. Nilai langsung tersimpan dan kursor pindah ke materi berikutnya."/>
+    {error&&<ErrorState message={error} onRetry={()=>{setError("");setRetry(x=>x+1);setReload(x=>x+1)}}/>}
     {storageError&&<Alert type="error">{storageError}</Alert>}
     {message&&<Alert>{message}</Alert>}
-    {rowsLoading?<LoadingState label="Memuat materi dan draft siswa"/>:studentId&&subId&&!error&&<section className="card section-gap">
-      <div className="section-heading"><div><p className="eyebrow">{activeStudent?.name} {activeStudent?.nis?`(${activeStudent.nis})`:""} · {subs.find(s=>String(s.id)===subId)?.title}</p><h2>Materi yang diuji</h2></div>
-        <div className="actions"><button disabled={busy||!session?.items.some(item=>item.score===null&&!draftMap[item.assessment_id])} onClick={fillUnassessed}><Sparkles size={15}/>Isi yang belum dinilai dengan 90</button><button className="primary" disabled={busy||!currentDrafts.length} onClick={()=>void saveItems(session?.items??[])}><Save size={15}/>{busy?"Menyimpan…":"Simpan Semua Nilai"}</button></div>
-      </div>
-      <div className="section-gap"><p className="hint">{assessed} dari {session?.items.length??0} materi tersimpan · {percent}% · {currentDrafts.length} perubahan belum dikirim</p><ProgressBar value={percent} label="Progres nilai tersimpan"/></div>
-      <p className="hint" id="individual-help">Nilai = 90 − jumlah kesalahan. Draft disimpan di perangkat dan dipulihkan saat kembali. Rekap memakai nilai yang sudah dikirim. Input kosong akan mengosongkan nilai saat disimpan.</p>
-      {!session?.items.length?<EmptyState title="Belum ada materi pada subbab ini"/>:<div className="individual-progress-list">{session.items.map(item=>{
-        const draft=draftMap[item.assessment_id],raw=rawFor(item),parsed=parseMistakes(raw),conflict=draft?.status==="conflict";
-        const label=busy&&draft?"Menyimpan…":draft?({dirty:"Draft",pending:"Menunggu sinkronisasi",conflict:"Konflik",failed:"Gagal"} as const)[draft.status]:item.score!==null?"Tersimpan":"Belum dinilai";
-        const rowError=!parsed.valid?parsed.error:draft?.error;
-        return <article className="card progress-material" key={item.assessment_id} data-dirty={!!draft}>
-          <div><h3>{item.title}</h3><p className="hint">{item.score!==null?`Nilai tersimpan: ${item.score}`:"Belum ada nilai tersimpan"}</p></div>
-          <StatusBadge tone={conflict||draft?.status==="failed"?"danger":draft?"warning":item.score!==null?"success":"neutral"}>{label}</StatusBadge>
-          <div className="individual-editor"><div className="score-editor">
-            <button className="ghost icon-button" aria-label={`Set nilai 90 untuk ${item.title}`} disabled={busy||conflict} onClick={()=>edit(item,"0")}>90</button>
-            <div className="mistake-stepper"><button disabled={busy||conflict} onClick={()=>adjust(item,-1)} aria-label={`Kurangi kesalahan ${item.title}`}>−</button>
-              <input aria-label={`Jumlah kesalahan ${item.title}`} aria-invalid={!parsed.valid} aria-describedby={rowError?`individual-error-${item.assessment_id}`:"individual-help"} disabled={busy||conflict} value={raw} inputMode="numeric" autoComplete="off" onChange={e=>edit(item,e.target.value)} onKeyDown={e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();adjust(item,e.key==="ArrowUp"?1:-1)}if(e.key==="Enter"){e.preventDefault();void saveItems([item])}}}/>
-              <button disabled={busy||conflict} onClick={()=>adjust(item,1)} aria-label={`Tambah kesalahan ${item.title}`}>+</button></div>
-            <button className="primary icon-button" aria-label={`Simpan nilai ${item.title}`} disabled={busy||!draft||!parsed.valid||conflict} onClick={()=>void saveItems([item])}><Check size={16}/></button>
-            {draft&&<button className="icon-button" aria-label={`Kembalikan nilai ${item.title}`} disabled={busy} onClick={()=>setDiscarding(item)}><RotateCcw size={15}/></button>}
-          </div>{rowError&&<p className="row-error" id={`individual-error-${item.assessment_id}`}>{rowError}</p>}{draft&&raw.trim()===""&&<p className="row-error">Nilai akan dikosongkan saat disimpan.</p>}</div>
-          <strong className="score-number" aria-label="Pratinjau nilai">{parsed.valid?parsed.score??"—":"—"}</strong>
-        </article>;
-      })}</div>}
-      {nextStudent&&session&&<div className="form-actions"><button className="primary" disabled={busy} onClick={()=>void saveItems(session.items,true)}>Simpan & siswa berikutnya: {nextStudent.name}<ArrowRight size={15}/></button></div>}
-    </section>}
-    {!studentId||!subId?<EmptyState title="Siap mulai menilai">Pilih kelas, siswa, bab, dan subbab untuk membuka materi penilaian.</EmptyState>:null}
-    {discarding&&<ConfirmDialog title="Kembalikan ke nilai server?" onClose={()=>{if(!busy)setDiscarding(null)}} onConfirm={()=>void discard()} confirmLabel="Kembalikan nilai">Draft {discarding.title} akan dibuang setelah nilai terbaru berhasil dimuat. Draft materi lain tetap disimpan.</ConfirmDialog>}
+    <div className="setoran-layout">
+      <aside className="card setoran-roster" ref={rosterRef} aria-label="Daftar siswa">
+        <div className="field"><label htmlFor="setoran-class">Kelas</label><select id="setoran-class" value={classId} onChange={e=>changeClass(e.target.value)}><option value="">Pilih kelas</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name} · {c.academic_year_name} / {c.semester}</option>)}</select></div>
+        {data&&<>
+          <div onKeyDown={e=>{if(e.key==="Enter"&&(e.target as HTMLElement).matches("input")&&firstMatch){e.preventDefault();selectStudent(firstMatch.id)}}}>
+            <SearchField label="Cari siswa" value={query} onChange={setQuery} placeholder="Cari siswa… (tekan /)"/>
+          </div>
+          <div className="setoran-roster-list">
+            {roster.today.length>0&&<><p className="roster-heading">Dinilai hari ini</p><ul>{roster.today.map(s=>rosterButton(s.id,s.name,s.nis))}</ul></>}
+            {roster.others.length>0&&<><p className="roster-heading">{roster.today.length?"Siswa lain":"Semua siswa"}</p><ul>{roster.others.map(s=>rosterButton(s.id,s.name,s.nis))}</ul></>}
+            {!roster.today.length&&!roster.others.length&&<p className="hint">{data.students.length?"Tidak ada siswa yang cocok.":"Belum ada siswa aktif di kelas ini."}</p>}
+          </div>
+        </>}
+      </aside>
+
+      <section className="setoran-editor" ref={editorRef}>
+        {!classId?<EmptyState title="Pilih kelas">Pilih kelas di panel kiri. Pilihan terakhir akan diingat.</EmptyState>
+        :dataLoading||!data?<LoadingState label="Memuat siswa dan nilai kelas"/>
+        :!data.materials.length?<EmptyState title="Materi periode ini belum tersedia" action={<Link className="button" href="/master-data/curriculum">Susun materi <ArrowRight size={15}/></Link>}>Tambahkan bab dan materi untuk tahun ajaran kelas ini.</EmptyState>
+        :!data.students.length?<EmptyState title="Belum ada siswa di kelas ini" action={<Link className="button primary" href={"/students?classId="+classId}>Tambah siswa</Link>}/>
+        :!student||!position?<EmptyState title="Pilih siswa yang maju">Klik nama di daftar, atau tekan <kbd>/</kbd>, ketik beberapa huruf nama, lalu Enter.</EmptyState>
+        :<div className="card">
+          <div className="setoran-head">
+            <div><p className="eyebrow">{data.className}{student.nis?` · ${student.nis}`:""}</p><h2>{student.name}</h2>
+              <p className="hint">{position.nextIndex<0?"Semua materi sudah dinilai.":`Materi berikutnya: ${position.nextIndex+1}. ${data.materials[position.nextIndex].title}`} · {position.assessed} dari {position.total} materi dinilai</p></div>
+            {position.nextIndex>=0&&<button type="button" onClick={()=>focusMaterial(position.nextIndex)}>Ke materi berikutnya<ArrowRight size={15}/></button>}
+          </div>
+          <ProgressBar value={position.total?Math.round(position.assessed/position.total*100):0} label={`Progres ${student.name}`}/>
+          {position.gaps.length>0&&<p className="setoran-gaps">Terlewat: {position.gaps.map((i,n)=><span key={i}>{n>0&&", "}<button type="button" className="link-button" onClick={()=>focusMaterial(i)}>{i+1}. {data.materials[i].title}</button></span>)}</p>}
+          <p className="hint" id="setoran-help"><kbd>Enter</kbd> simpan & lanjut · <kbd>↑</kbd>/<kbd>↓</kbd> ubah kesalahan · tombol <strong>90</strong> = lancar, langsung simpan · <kbd>/</kbd> cari siswa lain. Kosongkan lalu Enter untuk menghapus nilai.</p>
+          <div className="setoran-groups">{groups.map((group,gi)=>{
+            const done=group.items.filter(({material})=>scores[draftKey(student.id,material.id)]?.score!=null).length;
+            const hasNext=group.items.some(({index})=>index===position.nextIndex),expanded=open.has(group.key);
+            return <div className="setoran-group" key={group.key} data-open={expanded}>
+              {(gi===0||groups[gi-1].chapter!==group.chapter)&&<p className="setoran-chapter">{group.chapter}</p>}
+              <button type="button" className="setoran-group-toggle" aria-expanded={expanded} onClick={()=>setOpen(current=>{const next=new Set(current);if(next.has(group.key))next.delete(group.key);else next.add(group.key);return next})}>
+                <ChevronDown size={16} aria-hidden="true"/><span>{group.subchapter}</span>
+                {hasNext&&<StatusBadge tone="warning">Berikutnya</StatusBadge>}
+                <span className={"setoran-count"+(done===group.items.length?" complete":"")}>{done}/{group.items.length}</span>
+              </button>
+              {expanded&&<div className="setoran-rows">{group.items.map(({material,index})=>row(material,index))}</div>}
+            </div>;
+          })}</div>
+        </div>}
+      </section>
+    </div>
   </main>;
 }

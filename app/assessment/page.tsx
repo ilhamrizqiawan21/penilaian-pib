@@ -3,7 +3,8 @@ import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {ArrowRight,Check,Download,Eraser,Minus,Plus,RotateCcw,Save} from "lucide-react";
 import {api,errorMessage} from "@/lib/client-api";
-import {Assessment as Material,Chapter,ScoreRow,SchoolClass,Student,Subchapter} from "@/lib/frontend-types";
+import {ScoreRow,SchoolClass,Student} from "@/lib/frontend-types";
+import {ClassProgress,ProgressMaterial as Material} from "@/lib/class-progress";
 import {Alert,ConfirmDialog,EmptyState,ErrorState,LoadingState,PageHeader,ProgressBar,SearchField,StatusBadge,useToast} from "@/app/ui";
 import {DRAFT_EVENT,LAST_ASSESSMENT,ScoreDraft,createDraftId,deleteDraft,draftKey,isUnassessed,stepMistakes,parseMistakes,persistDraft,readDrafts} from "@/lib/assessment-workspace";
 import {SCORE_SAVED_EVENT,submitScore} from "@/lib/score-client";
@@ -12,11 +13,10 @@ type Context={classId:string;chapterId:string;subId:string;assessmentId:string};
 type ServerScore=ScoreRow&{updated_at?:string};
 const emptyContext:Context={classId:"",chapterId:"",subId:"",assessmentId:""};
 export default function Assessment(){
-  const [classes,setClasses]=useState<SchoolClass[]>([]),[chapters,setChapters]=useState<Chapter[]>([]);
-  const [subs,setSubs]=useState<Subchapter[]>([]),[materials,setMaterials]=useState<Material[]>([]);
+  const [classes,setClasses]=useState<SchoolClass[]>([]),[materials,setMaterials]=useState<Material[]>([]);
   const [students,setStudents]=useState<Student[]>([]),[scores,setScores]=useState<Record<number,ServerScore>>({});
   const [context,setContext]=useState<Context>(emptyContext),[drafts,setDrafts]=useState<ScoreDraft[]>([]);
-  const [loading,setLoading]=useState(true),[optionsLoading,setOptionsLoading]=useState(false),[materialsLoading,setMaterialsLoading]=useState(false),[rowsLoading,setRowsLoading]=useState(false);
+  const [loading,setLoading]=useState(true),[materialsLoading,setMaterialsLoading]=useState(false),[rowsLoading,setRowsLoading]=useState(false);
   const [error,setError]=useState(""),[message,setMessage]=useState(""),[storageError,setStorageError]=useState("");
   const [query,setQuery]=useState(""),[filter,setFilter]=useState<"all"|"unassessed"|"drafts">("all");
   const [saving,setSaving]=useState<number[]>([]),[saveAllBusy,setSaveAllBusy]=useState(false);
@@ -46,39 +46,32 @@ export default function Assessment(){
   useEffect(()=>{
     const controller=new AbortController();
     setLoading(true);setError("");
-    Promise.all([api<SchoolClass[]>("/api/classes",{signal:controller.signal}),api<Chapter[]>("/api/chapters",{signal:controller.signal})]).then(([c,ch])=>{
+    api<SchoolClass[]>("/api/classes",{signal:controller.signal}).then(c=>{
       if(controller.signal.aborted)return;
-      setClasses(c);setChapters(ch);
+      setClasses(c);
       let restored:Partial<Context>={};
       try{restored=JSON.parse(localStorage.getItem(LAST_ASSESSMENT)??"{}")}catch{}
       const params=new URLSearchParams(window.location.search);
       if(params.has("classId"))restored={classId:params.get("classId")??"",chapterId:params.get("chapterId")??"",subId:params.get("subId")??"",assessmentId:params.get("assessmentId")??""};
       const selectedClass=c.find(x=>String(x.id)===restored.classId);
-      const selectedChapter=ch.find(x=>String(x.id)===restored.chapterId&&(!x.academic_year_id||x.academic_year_id===selectedClass?.academic_year_id));
-      setContext({classId:selectedClass?String(selectedClass.id):"",chapterId:selectedChapter?String(selectedChapter.id):"",subId:selectedChapter?String(restored.subId??""):"",assessmentId:selectedChapter?String(restored.assessmentId??""):""});
+      // The material is validated against the class curriculum once it loads.
+      setContext(selectedClass?{...emptyContext,classId:String(selectedClass.id),assessmentId:String(restored.assessmentId??"")}:emptyContext);
     }).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e))}).finally(()=>{if(!controller.signal.aborted)setLoading(false)});
     return()=>controller.abort();
   },[initialReload]);
   useEffect(()=>{
-    const controller=new AbortController();setSubs([]);setMaterials([]);
-    if(!context.chapterId){setOptionsLoading(false);return}
-    setOptionsLoading(true);
-    api<Subchapter[]>("/api/subchapters?chapterId="+context.chapterId,{signal:controller.signal}).then(rows=>{
-      if(controller.signal.aborted)return;setSubs(rows);
-      setContext(c=>c.subId&&!rows.some(x=>String(x.id)===c.subId)?{...c,subId:"",assessmentId:""}:c);
-    }).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e))}).finally(()=>{if(!controller.signal.aborted)setOptionsLoading(false)});
-    return()=>controller.abort();
-  },[context.chapterId,reload]);
-  useEffect(()=>{
     const controller=new AbortController();setMaterials([]);
-    if(!context.subId){setMaterialsLoading(false);return}
+    if(!context.classId){setMaterialsLoading(false);return}
     setMaterialsLoading(true);
-    api<Material[]>("/api/assessments?subchapterId="+context.subId,{signal:controller.signal}).then(rows=>{
-      if(controller.signal.aborted)return;setMaterials(rows);
-      setContext(c=>c.assessmentId&&!rows.some(x=>String(x.id)===c.assessmentId)?{...c,assessmentId:""}:c);
+    api<ClassProgress>("/api/class-progress?classId="+context.classId,{signal:controller.signal}).then(result=>{
+      if(controller.signal.aborted)return;setMaterials(result.materials);
+      setContext(c=>{
+        const material=result.materials.find(x=>String(x.id)===c.assessmentId);
+        return material?{...c,chapterId:String(material.chapter_id),subId:String(material.subchapter_id)}:{...c,chapterId:"",subId:"",assessmentId:""};
+      });
     }).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e))}).finally(()=>{if(!controller.signal.aborted)setMaterialsLoading(false)});
     return()=>controller.abort();
-  },[context.subId,reload]);
+  },[context.classId,reload]);
   useEffect(()=>{
     const controller=new AbortController();setStudents([]);setScores({});setQuery("");setError("");
     if(!context.classId||!context.assessmentId){setRowsLoading(false);return}
@@ -117,6 +110,9 @@ export default function Assessment(){
   const invalidDrafts=currentDrafts.filter(x=>!parseMistakes(x.raw).valid).length;
   const percent=students.length?Math.round(assessed/students.length*100):0;
   const visible=students.filter(s=>(s.name+" "+(s.nis??"")).toLocaleLowerCase("id").includes(query.trim().toLocaleLowerCase("id"))&&(filter==="all"||filter==="drafts"?filter!=="drafts"||!!draftMap[s.id]:isUnassessed(scores[s.id]?.score,draftMap[s.id])));
+  function contextFor(material:Material|undefined):Context{
+    return material?{classId:context.classId,chapterId:String(material.chapter_id),subId:String(material.subchapter_id),assessmentId:String(material.id)}:{...emptyContext,classId:context.classId};
+  }
   function changeContext(next:Context){
     if(locks.current.size||saveAllBusy)return;
     if(volatile.current.size&&!window.confirm("Draft belum tersimpan di perangkat. Tetap ganti kelas atau materi?"))return;
@@ -190,27 +186,28 @@ export default function Assessment(){
   }
   function displayScore(student:Student){const parsed=parseMistakes(draftMap[student.id]?.raw??(scores[student.id]?.mistakes==null?"":String(scores[student.id].mistakes)));return parsed.valid?parsed.score??"—":"—"}
   const selectedClass=classes.find(x=>String(x.id)===context.classId);
-  const availableChapters=chapters.filter(x=>!x.academic_year_id||x.academic_year_id===selectedClass?.academic_year_id);
   const selectedMaterial=materials.find(x=>String(x.id)===context.assessmentId);
+  const materialIndex=materials.findIndex(x=>String(x.id)===context.assessmentId);
+  const materialGroups=materials.reduce<{key:number;label:string;items:{material:Material;index:number}[]}[]>((groups,material,index)=>{
+    const last=groups[groups.length-1];
+    if(last?.key===material.subchapter_id)last.items.push({material,index});else groups.push({key:material.subchapter_id,label:material.chapter+" › "+material.subchapter,items:[{material,index}]});
+    return groups;
+  },[]);
   const exportQuery=new URLSearchParams({...(context.classId?{classId:context.classId}:{}),...(context.assessmentId?{assessmentId:context.assessmentId}:{})}).toString();
   return <main className="app assessment-page" ref={inputRoot}>
     <PageHeader eyebrow="Ruang kerja guru" title="Penilaian" description="Pilih materi, isi kesalahan, lalu lanjutkan ke siswa berikutnya."><details><summary className="button"><Download size={15}/>Ekspor nilai</summary><div className="actions section-gap"><a className="button" href={"/api/export?"+exportQuery}>Excel</a><a className="button" href={"/api/pdf?"+exportQuery}>PDF</a></div></details></PageHeader>
-    <section className="card assessment-context"><div className="context-toggle"><div><strong>{selectedMaterial?"Materi penilaian":"Siapkan penilaian"}</strong>{selectedMaterial&&<p className="hint">{selectedClass?.name} · {selectedMaterial.title}</p>}</div>{selectedMaterial&&<button aria-expanded={editingContext} aria-controls="assessment-options" onClick={()=>setEditingContext(x=>!x)}>{editingContext?"Tutup pilihan":"Ubah pilihan"}</button>}</div><div id="assessment-options" hidden={!!selectedMaterial&&!editingContext}><div className="section-heading"><h2>Kelas & materi</h2><span className="hint">Nilai = 90 − jumlah kesalahan</span></div>
-      {loading?<LoadingState/>:<div className="form-grid section-gap">
+    <section className="card assessment-context"><div className="context-toggle"><div><strong>{selectedMaterial?"Materi penilaian":"Siapkan penilaian"}</strong>{selectedMaterial&&<p className="hint">{selectedClass?.name} · {selectedMaterial.subchapter} · {materialIndex+1}. {selectedMaterial.title}</p>}</div>{selectedMaterial&&<button aria-expanded={editingContext} aria-controls="assessment-options" onClick={()=>setEditingContext(x=>!x)}>{editingContext?"Tutup pilihan":"Ubah pilihan"}</button>}</div><div id="assessment-options" hidden={!!selectedMaterial&&!editingContext}><div className="section-heading"><h2>Kelas & materi</h2><span className="hint">Nilai = 90 − jumlah kesalahan</span></div>
+      {loading?<LoadingState/>:<div className="form-grid section-gap assessment-picker">
         <div className="field"><label htmlFor="assessment-class">Kelas</label><select id="assessment-class" value={context.classId} disabled={saving.length>0||saveAllBusy} onChange={e=>changeContext({...emptyContext,classId:e.target.value})}><option value="">Pilih kelas</option>{classes.map(x=><option key={x.id} value={x.id}>{x.name} · {x.academic_year_name} / {x.semester}</option>)}</select></div>
-        <div className="field"><label htmlFor="assessment-chapter">Bab</label><select id="assessment-chapter" disabled={!context.classId||saving.length>0||saveAllBusy} value={context.chapterId} onChange={e=>changeContext({...context,chapterId:e.target.value,subId:"",assessmentId:""})}><option value="">Pilih bab</option>{availableChapters.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></div>
-        <div className="field"><label htmlFor="assessment-sub">Subbab</label><select id="assessment-sub" disabled={!context.chapterId||optionsLoading||saving.length>0||saveAllBusy} value={context.subId} onChange={e=>changeContext({...context,subId:e.target.value,assessmentId:""})}><option value="">Pilih subbab</option>{subs.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></div>
-        <div className="field"><label htmlFor="assessment-material">Materi</label><select id="assessment-material" disabled={!context.subId||materialsLoading||saving.length>0||saveAllBusy} value={context.assessmentId} onChange={e=>{changeContext({...context,assessmentId:e.target.value});setEditingContext(false)}}><option value="">Pilih materi</option>{materials.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></div>
+        <div className="field"><label htmlFor="assessment-material">Materi</label><select id="assessment-material" disabled={!context.classId||materialsLoading||saving.length>0||saveAllBusy} value={context.assessmentId} onChange={e=>{changeContext(contextFor(materials.find(x=>String(x.id)===e.target.value)));setEditingContext(false)}}><option value="">{materialsLoading?"Memuat materi…":"Pilih materi"}</option>{materialGroups.map(group=><optgroup key={group.key} label={group.label}>{group.items.map(({material,index})=><option key={material.id} value={material.id}>{index+1}. {material.title}</option>)}</optgroup>)}</select></div>
       </div>}
-      {!loading&&context.classId&&!availableChapters.length&&<EmptyState title="Materi periode ini belum tersedia" action={<Link className="button" href="/master-data/curriculum">Susun materi <ArrowRight size={15}/></Link>}>Tambahkan bab dan materi untuk tahun ajaran kelas ini.</EmptyState>}
-      {!loading&&!optionsLoading&&context.chapterId&&!subs.length&&!error&&<EmptyState title="Bab ini belum memiliki subbab" action={<Link className="button" href={"/master-data/curriculum/"+context.chapterId}>Tambah subbab</Link>}/>}
-      {context.subId&&!materialsLoading&&subs.length>0&&!materials.length&&!error&&<p className="notice">Jika belum ada materi, tambahkan melalui menu Materi.</p>}
+      {!loading&&!materialsLoading&&context.classId&&!materials.length&&!error&&<EmptyState title="Materi periode ini belum tersedia" action={<Link className="button" href="/master-data/curriculum">Susun materi <ArrowRight size={15}/></Link>}>Tambahkan bab dan materi untuk tahun ajaran kelas ini.</EmptyState>}
     </div></section>
     {error&&<ErrorState message={error} onRetry={()=>{setError("");setInitialReload(x=>x+1);setReload(x=>x+1)}}/>}
     {storageError&&<Alert type="error">{storageError}</Alert>}
     {message&&<Alert>{message}</Alert>}
     {rowsLoading?<LoadingState label="Memuat daftar siswa dan nilai"/>:context.assessmentId&&context.classId&&!error?<section className="section-gap">
-      <div className="assessment-summary"><div><p className="eyebrow">{selectedClass?.name} · {selectedClass?.academic_year_name}</p><h2>{selectedMaterial?.title??"Daftar penilaian"}</h2><p>{assessed} dari {students.length} siswa tersimpan di server · {percent}% tersimpan</p><ProgressBar value={percent} label="Progres penilaian kelas"/></div><div className="actions"><button className="button" disabled={!materials.length||materials.findIndex(x=>x.id===Number(context.assessmentId))<=0} onClick={()=>{const i=materials.findIndex(x=>x.id===Number(context.assessmentId));if(i>0)changeContext({...context,assessmentId:String(materials[i-1].id)})}}><ArrowRight size={15} style={{transform:"rotate(180deg)"}}/>Materi sebelumnya</button><button className="primary" disabled={!savableDrafts.length||saving.length>0||saveAllBusy} onClick={()=>void saveAll()}><Save size={15}/>{saveAllBusy?"Menyimpan…":"Simpan draft valid ("+savableDrafts.length+")"}</button><button className="button" disabled={!materials.length||materials.findIndex(x=>x.id===Number(context.assessmentId))<0||materials.findIndex(x=>x.id===Number(context.assessmentId))>=materials.length-1} onClick={()=>{const i=materials.findIndex(x=>x.id===Number(context.assessmentId));if(i>=0&&i<materials.length-1)changeContext({...context,assessmentId:String(materials[i+1].id)})}}>Materi berikutnya<ArrowRight size={15}/></button></div></div>
+      <div className="assessment-summary"><div><p className="eyebrow">{selectedClass?.name} · {selectedClass?.academic_year_name}</p><h2>{selectedMaterial?`${materialIndex+1}. ${selectedMaterial.title}`:"Daftar penilaian"}</h2><p>{assessed} dari {students.length} siswa tersimpan di server · {percent}% tersimpan</p><ProgressBar value={percent} label="Progres penilaian kelas"/></div><div className="actions"><button className="button" disabled={materialIndex<=0} onClick={()=>{if(materialIndex>0)changeContext(contextFor(materials[materialIndex-1]))}}><ArrowRight size={15} style={{transform:"rotate(180deg)"}}/>Materi sebelumnya</button><button className="primary" disabled={!savableDrafts.length||saving.length>0||saveAllBusy} onClick={()=>void saveAll()}><Save size={15}/>{saveAllBusy?"Menyimpan…":"Simpan draft valid ("+savableDrafts.length+")"}</button><button className="button" disabled={materialIndex<0||materialIndex>=materials.length-1} onClick={()=>{if(materialIndex>=0&&materialIndex<materials.length-1)changeContext(contextFor(materials[materialIndex+1]))}}>Materi berikutnya<ArrowRight size={15}/></button></div></div>
       <div className="assessment-stats" aria-label="Ringkasan penilaian"><span><strong>{students.length}</strong> siswa</span><span><strong>{remaining}</strong> belum dinilai</span><span><strong>{currentDrafts.length}</strong> perubahan belum dikirim</span>{invalidDrafts>0&&<span className="danger"><strong>{invalidDrafts}</strong> perlu diperbaiki</span>}</div>
       <div className="toolbar"><SearchField label="Cari siswa" value={query} onChange={setQuery} placeholder="Cari nama atau NIS…"/><div className="segmented" role="group" aria-label="Status penilaian">{([["all","Semua"],["unassessed","Belum selesai"],["drafts","Draft"]] as const).map(([value,label])=><button key={value} type="button" aria-pressed={filter===value} onClick={()=>setFilter(value)}>{label}</button>)}</div></div>
       <p className="hint" id="score-help"><kbd>↑</kbd>/<kbd>↓</kbd> ubah kesalahan · <kbd>Enter</kbd> simpan & lanjut. 0 kesalahan = nilai 90. Input kosong = belum dinilai. Draft tersimpan di perangkat; rekap memakai nilai yang sudah dikirim.</p>
