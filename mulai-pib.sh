@@ -43,11 +43,11 @@ fi
 
 if [[ ! -f "$ENV_FILE" && ! -f "$ROOT_DIR/.env" ]]; then
   echo "[PIB] Membuat konfigurasi lokal dan secret session..."
-  node -e 'const fs=require("node:fs"),crypto=require("node:crypto"),file=process.argv[1]; fs.writeFileSync(file, `DATABASE_URL="file:./pib.sqlite"\nSESSION_SECRET="${crypto.randomBytes(32).toString("hex")}"\n`, {mode:0o600})' "$ENV_FILE"
+  node -e 'const fs=require("node:fs"),crypto=require("node:crypto"),file=process.argv[1]; fs.writeFileSync(file, `SESSION_SECRET="${crypto.randomBytes(32).toString("hex")}"\n`, {mode:0o600})' "$ENV_FILE"
 fi
 
-if [[ ! -f "$ROOT_DIR/pib.sqlite" && -x "$TSX_BIN" ]]; then
-  echo "[PIB] Menyiapkan database awal..."
+if [[ -x "$TSX_BIN" ]]; then
+  echo "[PIB] Memeriksa database..."
   "$TSX_BIN" scripts/setup-db.ts
 fi
 

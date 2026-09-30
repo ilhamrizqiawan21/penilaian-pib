@@ -20,10 +20,10 @@ npm ci
 node <<'JS'
 const fs = require('node:fs'), crypto = require('node:crypto');
 if (!fs.existsSync('.env.local') && !fs.existsSync('.env')) {
-  fs.writeFileSync('.env.local', `DATABASE_URL="file:./pib.sqlite"\nSESSION_SECRET="${crypto.randomBytes(32).toString('hex')}"\n`, {mode: 0o600, flag: 'wx'});
+  fs.writeFileSync('.env.local', `SESSION_SECRET="${crypto.randomBytes(32).toString('hex')}"\n`, {mode: 0o600, flag: 'wx'});
 }
 JS
-if [[ ! -f pib.sqlite ]]; then npm run db:setup; fi
+npm run db:setup
 npm run check
 mkdir -p "$HOME/.config/systemd/user"
 python3 - "$ROOT_DIR" "$HOME/.config/systemd/user/pib-penilaian.service" <<'PY'

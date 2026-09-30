@@ -2,20 +2,25 @@ import {NextResponse} from "next/server";
 import {z} from "zod";
 import {audit,createSnapshot,db,schemaVersion} from "@/lib/db";
 import {isResponse,readJson,requireRole,requireUser,writeGuard} from "@/lib/api";
+import {RestoreError,restoreFromJson,auditUserId} from "@/lib/restore";
 
-// Must match BACKUP_TABLES in backup/route.ts (users excluded for security)
-const RESTORE_TABLES = [
-  "academic_years",
-  "classes",
-  "students",
-  "curriculum_templates",
-  "chapters",
-  "subchapters",
-  "assessments",
-  "scores",
-  "settings",
-  "audit_logs",
-  "sync_operations",
-] as const;
-const payload=z.object({version:z.literal(2),schemaVersion:z.number().int().positive(),createdAt:z.string(),app:z.literal("pib-penilaian"),data:z.record(z.string(),z.array(z.record(z.string(),z.unknown()))) });
-export async function POST(req:Request){const guard=writeGuard(req);if(guard)return guard;const user=await requireUser();if(isResponse(user))return user;const role= requireRole(user,["TEACHER","ADMIN"]);if(role)return role;try{const parsed=payload.parse(await readJson(req,10_000_000));if(parsed.schemaVersion>schemaVersion()||Object.keys(parsed.data).some(key=>!(RESTORE_TABLES as readonly string[]).includes(key)))throw Error();for(const table of RESTORE_TABLES){if(!Array.isArray(parsed.data[table]))throw Error();const expected=(db.prepare(`PRAGMA table_info(${table})`).all() as {name:string}[]).map(column=>column.name);for(const row of parsed.data[table]??[])if(Object.keys(row).some(key=>!expected.includes(key)))throw Error()}const snapshot=createSnapshot("restore");const restored=db.transaction(()=>{for(const table of [...RESTORE_TABLES].reverse())db.prepare(`DELETE FROM ${table}`).run();let rows=0;for(const table of RESTORE_TABLES)for(const row of parsed.data[table]??[]){const columns=Object.keys(row);if(!columns.length)continue;db.prepare(`INSERT INTO ${table} (${columns.join(",")}) VALUES (${columns.map(()=>"?").join(",")})`).run(...columns.map(column=>row[column]??null));rows++}if(db.prepare("PRAGMA foreign_key_check").all().length)throw Error();return rows})();audit(user.id,"restore","local","RESTORE",`Restore ${restored} data${snapshot?" dengan snapshot":""}`);return NextResponse.json({ok:true,restored,snapshot:Boolean(snapshot)})}catch{audit(user.id,"restore","local","FAILED","Restore ditolak atau gagal");return NextResponse.json({error:"Backup tidak valid atau gagal dipulihkan"},{status:400})}}
+// Versi 2 = tanpa tabel users; versi 3 = lengkap dengan users dan sesi tes individual.
+const payload=z.object({version:z.union([z.literal(2),z.literal(3)]),schemaVersion:z.number().int().positive(),createdAt:z.string(),app:z.literal("pib-penilaian"),data:z.record(z.string(),z.array(z.record(z.string(),z.unknown())))});
+
+export async function POST(req:Request){
+  const guard=writeGuard(req);if(guard)return guard;
+  const user=await requireUser();if(isResponse(user))return user;
+  const role=requireRole(user,["TEACHER","ADMIN"]);if(role)return role;
+  try{
+    const parsed=payload.parse(await readJson(req,10_000_000));
+    if(parsed.schemaVersion>schemaVersion())throw new RestoreError("Backup dibuat oleh versi aplikasi yang lebih baru. Perbarui aplikasi terlebih dahulu.");
+    const snapshot=createSnapshot("restore");
+    const restored=restoreFromJson(db,parsed.data);
+    audit(auditUserId(user.id),"restore","local","RESTORE",`Restore ${restored} data dari JSON${snapshot?" dengan snapshot":""}`);
+    return NextResponse.json({ok:true,restored,snapshot:Boolean(snapshot)});
+  }catch(error){
+    audit(auditUserId(user.id),"restore","local","FAILED","Restore ditolak atau gagal");
+    return NextResponse.json({error:error instanceof RestoreError?error.message:"Backup tidak valid atau gagal dipulihkan"},{status:400});
+  }
+}
+

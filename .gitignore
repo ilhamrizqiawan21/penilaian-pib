@@ -1,15 +1,39 @@
+# Dependensi dan hasil build
 node_modules
 .runtime/
 .next
 .next-prod
+.next-electron
 .next-stale-*
+dist-electron
+coverage
+*.tsbuildinfo
+
+# Konfigurasi dan rahasia lokal
 .env
 .env.local
-coverage
-logs/
+.env.*.local
+.claude/settings.local.json
+
+# Data aplikasi (data siswa, jangan pernah di-push)
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+*.sqlite-journal
 backups/
+logs/
 prisma/migrations
 prisma/pib.sqlite*
+
+# Artefak alat bantu, tangkapan layar, dan log
+.playwright-mcp/
+sidebar-after.png
+*.log
+npm-debug.log*
+
+# File sistem operasi dan editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/

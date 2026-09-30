@@ -1,22 +1,11 @@
 import {NextResponse} from "next/server";
 import {audit,db,schemaVersion} from "@/lib/db";
 import {isResponse,requireRole,requireUser} from "@/lib/api";
+import {RESTORE_ORDER} from "@/lib/restore";
 
-// Daftar tabel yang diekspor ke backup. Tabel `users` sengaja dikecualikan untuk menghindari
-// pengikutsertaan password_hash. Akun guru dipulihkan secara terpisah (manual/khusus).
-const BACKUP_TABLES = [
-  "academic_years",
-  "classes",
-  "students",
-  "curriculum_templates",
-  "chapters",
-  "subchapters",
-  "assessments",
-  "scores",
-  "settings",
-  "audit_logs",
-  "sync_operations",
-] as const;
+// Semua tabel data, termasuk users (untuk atribusi penilai) dan sesi tes individual.
+// File backup memuat password_hash akun, jadi perlakukan sebagai berkas rahasia.
+const BACKUP_TABLES = RESTORE_ORDER;
 
 export async function GET() {
   const user = await requireUser();
@@ -27,10 +16,10 @@ export async function GET() {
   const data = Object.fromEntries(
     BACKUP_TABLES.map((table) => [table, db.prepare(`SELECT * FROM ${table}`).all()])
   );
-  audit(user.id, "backup", "local", "DOWNLOAD", "Backup data-only dibuat");
+  audit(user.id, "backup", "local", "DOWNLOAD", "Backup lengkap dibuat");
   return new NextResponse(
     JSON.stringify({
-      version: 2,
+      version: 3,
       schemaVersion: schemaVersion(),
       createdAt: new Date().toISOString(),
       app: "pib-penilaian",

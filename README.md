@@ -81,6 +81,47 @@ systemctl --user restart pib-penilaian.service
 
 Data aplikasi tersimpan di `pib.sqlite`, sedangkan konfigurasi lokal tersimpan di `.env.local` dan tidak masuk Git.
 
+## Lokasi data dan backup otomatis
+
+Database **tidak lagi disimpan di folder aplikasi**. Lokasi bawaan:
+
+- Windows: `%APPDATA%\PIB-Penilaian\pib.sqlite`
+- Linux: `~/.local/share/PIB-Penilaian/pib.sqlite`
+
+Pada start pertama, `pib.sqlite` lama di folder proyek disalin otomatis ke lokasi baru (termasuk isi file `-wal`). File lama tidak dihapus dan tidak dipakai lagi; simpan sebagai cadangan lalu hapus manual bila sudah yakin.
+
+Server membuat backup `.sqlite` utuh secara berkala (hanya bila data berubah) dan menyimpan 30 terakhir. Atur lewat `.env.local`:
+
+```text
+PIB_DATA_DIR="D:\DataPIB"                              # pindahkan lokasi database
+PIB_BACKUP_DIR="C:\Users\NAMA\OneDrive\PIB-Backup"     # folder backup (disarankan yang tersinkron cloud)
+PIB_BACKUP_INTERVAL_HOURS=2
+PIB_BACKUP_KEEP=30
+```
+
+Bawaan folder backup: `backups\scheduled` di samping database. Agar aman saat laptop rusak atau hilang, arahkan `PIB_BACKUP_DIR` ke folder OneDrive/Google Drive/flashdisk.
+
+Memulihkan di device baru: pasang aplikasi, buka menu **Laporan dan backup > Pulihkan data dari backup**, lalu pilih file backup `pib-YYYYMMDD-HHMMSS.sqlite` (dari folder backup) atau `backup-pib-*.json` (unduhan manual). Akun, kelas, siswa, materi, dan nilai ikut dipulihkan; server membuat snapshot sebelum memulihkan. File backup memuat hash password akun, jadi simpan sebagai berkas rahasia. Jangan menyalin `pib.sqlite` langsung dari database yang sedang berjalan karena data terbaru bisa berada di file `-wal`; gunakan file backup.
+
+## Aplikasi desktop (Electron, Windows)
+
+Aplikasi dapat dibungkus menjadi installer `.exe` yang berjalan tanpa Node.js, tanpa browser, dan tanpa terminal.
+
+```bash
+npm run electron:build   # installer NSIS -> dist-electron/release/PIB-Penilaian-Setup-<versi>.exe
+npm run electron:pack    # hanya folder aplikasi (dist-electron/release/win-unpacked), untuk uji cepat
+```
+
+Cara kerjanya: `next build` dengan `PIB_STANDALONE=1` (folder `.next-electron`, terpisah dari `.next-prod` milik launcher), hasilnya disusun di `dist-electron/stage`, binary `better-sqlite3` diganti dengan versi prebuilt untuk Electron, lalu `electron-builder` membuat installer. Skrip pembangunnya: `scripts/build-electron.mjs`; proses utama: `electron/main.cjs`.
+
+- Server berjalan di `127.0.0.1:43117` (port tetap agar draft penilaian di localStorage tidak hilang; jika terpakai, dipilih port lain).
+- Data ada di `%APPDATA%\PIB-Penilaian` (database, `backups`, `logs\server.log`, `session-secret`). Folder ini **tidak dihapus** saat uninstall atau update, dan sama dengan lokasi data versi launcher, sehingga data lama langsung terbaca.
+- Menu **Berkas > Buka folder data / Buka folder backup** membuka folder tersebut. `PIB_DATA_DIR` dan `PIB_BACKUP_DIR` tetap berlaku sebagai variabel lingkungan sistem.
+- Hanya satu jendela aplikasi yang dapat berjalan; membuka lagi akan memunculkan jendela yang ada.
+- Pemasang belum ditandatangani (code signing), sehingga Windows SmartScreen dapat menampilkan peringatan "Windows protected your PC". Pilih **More info > Run anyway**.
+- Paket tidak memuat database apa pun; `build-electron.mjs` membuang berkas `*.sqlite*` dan `.env*` dari paket.
+- Versi Electron dipilih agar ABI-nya memiliki binary prebuilt `better-sqlite3`. Saat menaikkan Electron atau `better-sqlite3`, periksa dahulu ketersediaannya (`prebuild-install` melaporkan "No prebuilt binaries found" bila belum ada).
+
 ## Menjalankan manual untuk development
 
 ```bash

@@ -1,0 +1,31 @@
+appId: id.pib.penilaian
+productName: PIB Penilaian
+directories:
+  app: dist-electron/stage
+  output: dist-electron/release
+  buildResources: build
+files:
+  - main.cjs
+  - package.json
+  - "!node_modules/**"
+# Server Next.js + modul native harus berada di luar asar.
+extraResources:
+  - from: dist-electron/stage/server
+    to: server
+    filter:
+      - "**/*"
+      - "**/node_modules/**"
+      - "**/.next-electron/**"
+asar: true
+npmRebuild: false
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  artifactName: PIB-Penilaian-Setup-${version}.${ext}

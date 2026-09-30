@@ -23,13 +23,11 @@ if not exist "node_modules\.bin\next.cmd" (
 
 if not exist ".env.local" if not exist ".env" (
   echo [PIB] Membuat konfigurasi lokal...
-  node -e "const fs=require('node:fs'),c=require('node:crypto'),q=String.fromCharCode(34);fs.writeFileSync('.env.local','DATABASE_URL='+q+'file:./pib.sqlite'+q+'\n'+'SESSION_SECRET='+q+c.randomBytes(32).toString('hex')+q+'\n')"
+  node -e "const fs=require('node:fs'),c=require('node:crypto'),q=String.fromCharCode(34);fs.writeFileSync('.env.local','SESSION_SECRET='+q+c.randomBytes(32).toString('hex')+q+'\n')"
 )
 
-if not exist "pib.sqlite" (
-  echo [PIB] Menyiapkan database awal...
-  call node_modules\.bin\tsx.cmd scripts\setup-db.ts || (pause & exit /b 1)
-)
+echo [PIB] Memeriksa database...
+call node_modules\.bin\tsx.cmd scripts\setup-db.ts || (pause & exit /b 1)
 
 if not exist ".next-prod\BUILD_ID" (
   echo [PIB] Menyiapkan versi production...
